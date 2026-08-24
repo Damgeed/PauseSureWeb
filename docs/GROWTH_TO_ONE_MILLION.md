@@ -26,7 +26,31 @@ Avoid leading with “AI scam detector.” That description places PauseSure in 
 | Norton Genie | Analyzes messages, email, social posts, websites, and screenshots, then offers next-step tips. Norton's privacy notice says some original submissions may be retained for 30 days and de-identified text for one year. [Official privacy notice](https://us.norton.com/privacy/products-privacy-notice) | Make retention and deletion plain at the decision point; minimize by default; prove the difference with public, testable policies. |
 | Bitdefender Scam Protection / Scamio | Checks messages, links, ads, impersonation, screenshots, QR codes, and other interactions across its security suite. [Official product page](https://www.bitdefender.com/en-us/consumer/scam-protection) | Win on simplicity, family consent, evidence explanation, and a focused workflow—not feature-count claims. |
 | McAfee Scam Detector | Adds QR checks and social-message protection inside broader consumer security plans. [Official announcement](https://www.mcafee.com/en-us/newsroom/press-releases/2026/mcafee-simplifies-safety-with-new-instant-qr-code-scam-checks-and-smarter-social-messaging-scam-protection.html) | Be the independent “pause layer” that works across scam channels and shows the official next place to verify. |
+| Aura | Combines family identity/security coverage with call and message protection. Its U.S. App Store listing has a large review base, and positive reviews repeatedly emphasize easy navigation and peace of mind. [App Store listing and reviews](https://apps.apple.com/us/app/aura-security-protection/id1547735089) | Preserve the simple five-tab shell and make family help feel supportive rather than supervisory. Test ease and comprehension with older adults, not only technically confident users. |
 | Apple and carrier/platform defenses | Native warnings, message filtering, caller controls, privacy labels, and App Store trust. | Complement platform protection. Never imply native access or blocking capabilities the shipped app does not have. |
+
+### What users visibly value—and what they reject
+
+Public listings and review themes do not reveal exact feature usage, so treat this as directional evidence to validate in the PauseSure beta rather than a substitute for product analytics.
+
+| User signal | Market evidence | PauseSure integration |
+| --- | --- | --- |
+| **Reach protection before acting** | Truecaller leads with pre-answer identity/spam context; McAfee now emphasizes instant QR checks; ScamShield makes check, block, filter, and report directly accessible. [Truecaller App Store](https://apps.apple.com/ca/app/truecaller-spam-call-blocker/id448142450), [McAfee announcement](https://www.mcafee.com/en-us/newsroom/press-releases/2026/mcafee-simplifies-safety-with-new-instant-qr-code-scam-checks-and-smarter-social-messaging-scam-protection.html), [ScamShield App Store](https://apps.apple.com/us/app/scamshield/id1497144087) | Already present through the share extension, message filter, QR flow, screenshots, links, and quick checks. Beta target: selected content to first useful action in under 30 seconds. |
+| **Understand why** | Bitdefender Scamio accepts text, links, QR codes, and screenshots and returns an analysis plus recommended action. [Scamio](https://www.bitdefender.com/en-us/consumer/scamio) | Already central: show pressure signals, evidence, uncertainty, and the next action. Never collapse the result into a confidence score alone. |
+| **Simple navigation and peace of mind** | Positive Aura reviews repeatedly praise usability and the feeling of having protection in one place. [Aura reviews](https://apps.apple.com/us/app/aura-security-protection/id1547735089?see-all=reviews&platform=iphone) | Keep the five-tab navigation, plain verbs, large targets, Dynamic Type, and calm color hierarchy. Validate task completion and comprehension with the launch audience. |
+| **Family protection without friction** | Aura markets family-wide protection; Truecaller has family protection; these products make safety a household purchase rather than a solo utility. [Aura](https://www.aura.com/spam-call-message-protection), [Truecaller](https://www.truecaller.com/blog/news/truecaller-vs.-apple-call-screening) | Trusted Circle is the stronger PauseSure expression: selective, reversible sharing and no silent family surveillance. Optimize invite comprehension and acceptance—not raw invite volume. |
+| **Proactive local awareness** | Bitdefender's Scam Radar highlights emerging regional scams before a user submits an item. [Bitdefender Scam Protection](https://www.bitdefender.com/en-us/consumer/scam-protection) | Add an opt-in **Scam Pulse** in Learn after launch: a small, official-source-backed feed by country/region, with coarse location only if the user chooses it. Do not ingest private checks to power it by default. |
+| **A useful call summary** | Truecaller reviews praise the ability to see why an unfamiliar caller is calling; other reviews complain when spam still gets through or features sit behind a subscription. [Truecaller reviews](https://apps.apple.com/us/app/truecaller-premium-caller-id/id448142450?see-all=reviews&platform=iphone) | Keep the supported audio/voicemail import honest. Explore user-initiated voicemail/transcript summaries, but do not claim cellular-call recording or guaranteed blocking. Keep urgent verification outside the paywall. |
+| **Help after harm** | Bitdefender explicitly notes that an analyzer does not preserve evidence, reverse payments, or build a recovery case. [Scam evidence checklist](https://www.bitdefender.com/en-us/blog/hotforsecurity/scam-evidence-checklist/) | This is PauseSure's clearest wedge: bank/account containment, evidence preservation, secure export, official reporting, and follow-up reminders in one recovery plan. |
+
+Common negative themes are equally important: missed spam, overconfident labels, subscription surprise, permission anxiety, confusing setup, and slow or unclear support. PauseSure should answer them with abstention, honest limits, narrow permissions, transparent pricing, accessible onboarding, and a real support service-level target.
+
+### Feature priority from this research
+
+1. **Ship and measure the current core:** intentional multi-format capture, explainable results, independent verification, Trusted Circle, recovery, secure export, and the message/share extensions.
+2. **Next after beta evidence:** Scam Pulse using reviewed official sources; official-route shortcuts that never reuse the suspicious sender's contact details; outcome-based reminders; two audience-specific App Store product pages.
+3. **Only after privacy/legal validation:** phone-number intelligence from a vetted provider, opt-in community signals with abuse controls, and any institution-sponsored entitlements.
+4. **Do not build as a shortcut:** fear notifications, secret family monitoring, anonymous public accusations, a paywall on urgent recovery, or a “100% safe” verdict.
 
 ### The five-part moat
 
@@ -165,6 +189,17 @@ Exit criteria: one million cumulative installs, ≥250,000 MAU, ≥55% of acquis
 - Test audience-specific creative, not cosmetic variations.
 - Align ad promise, custom product page, onboarding choice, and first check.
 - Review search terms weekly; add negatives aggressively; report cost per activated D30 user.
+- Use a product preview of up to 30 seconds with visually strong opening seconds because App Store previews autoplay muted. [Apple product page guidance](https://developer.apple.com/app-store/product-page/)
+- Build custom product pages for “protect myself,” “help someone I trust,” and later scam-specific intent; Apple supports up to 70 additional product-page versions and audience-specific URLs. [Apple custom product pages](https://developer.apple.com/app-store/custom-product-pages/)
+
+### Paid video
+
+- Start with a 15-second master that names the pressure in the first two seconds, shows the action by second five, demonstrates real UI, and ends with one action.
+- Produce native 9:16 and 16:9 cuts; add 1:1 only when a campaign requires it. Google recommends vertical 9:16 for Shorts and multiple orientations for broader eligibility. [Google vertical video guidance](https://support.google.com/google-ads/answer/9128498), [Google Performance Max video guidance](https://support.google.com/google-ads/answer/14528532)
+- For Stories, test a 6–10 second cut because Meta reports stronger performance for shorter Stories creative; keep critical elements out of Reels/Stories interface safe zones. [Meta video guidance](https://www.facebook.com/business/help/188534925073536), [Meta safe zones](https://www.facebook.com/business/help/980593475366490)
+- Build for muted comprehension. Audio should add feeling, not carry the message.
+- Test one variable at a time: hook, audience, or call to action. Optimize to first check and D30 retention—not view-through rate or installs alone.
+- Do not scale Google/Meta prospecting until the App Store listing is live, attribution is configured, and at least one organic/TestFlight cohort shows retention.
 
 ### Website and SEO
 

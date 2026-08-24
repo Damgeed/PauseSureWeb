@@ -40,7 +40,7 @@ npm test
 
 ## Deployment
 
-The site is deployed with ChatGPT Sites. `.openai/hosting.json` identifies the existing PauseSure Sites project; it contains no deployment credential. Production deployment remains a deliberate owner-approved action.
+The production site is published at [pausesure.com](https://pausesure.com). Hosting identity files contain no deployment credential, and production publication remains a deliberate owner-approved action.
 
 Do not add analytics, advertising pixels, form collection, authentication, or third-party scripts without first updating the privacy review, security review, App Store disclosures where relevant, and public policy pages.
 

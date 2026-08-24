@@ -12,16 +12,16 @@ export const metadata: Metadata = {
     description: "A calm second opinion for suspicious messages, links, calls, and requests.",
     url: "https://pausesure.com",
     siteName: "PauseSure",
-    images: [{ url: "/brand/pausesure-logo.png", width: 1254, height: 1254, alt: "PauseSure" }],
+    images: [{ url: "/og.png", width: 1200, height: 630, alt: "PauseSure — Pause before pressure becomes a payment" }],
     locale: "en_US",
     type: "website",
   },
-  twitter: { card: "summary", title: "PauseSure", description: "Pause before pressure becomes a payment.", images: ["/brand/pausesure-logo.png"] },
+  twitter: { card: "summary_large_image", title: "PauseSure", description: "Pause before pressure becomes a payment.", images: ["/og.png"] },
   robots: { index: true, follow: true },
   alternates: { canonical: "https://pausesure.com" },
   category: "technology",
   other: { "theme-color": "#031B49" },
-  icons: { icon: "/brand/pausesure-logo.png", apple: "/brand/pausesure-logo.png" },
+  icons: { icon: "/brand/pausesure-logo.webp", apple: "/brand/pausesure-logo.webp" },
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
@@ -30,7 +30,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
     "@type": "Organization",
     name: "PauseSure",
     url: "https://pausesure.com",
-    logo: "https://pausesure.com/brand/pausesure-logo.png",
+    logo: "https://pausesure.com/brand/pausesure-logo.webp",
     email: "hello@pausesure.com",
     description: "Decision-support technology for suspicious messages, links, calls, and requests.",
   };

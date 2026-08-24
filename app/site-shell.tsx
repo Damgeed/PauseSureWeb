@@ -1,4 +1,3 @@
-import Image from "next/image";
 import Link from "next/link";
 
 const primaryNavigation = [
@@ -13,27 +12,37 @@ export function Arrow() {
   return <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 10h11M11 6l4 4-4 4" /></svg>;
 }
 
+export function StaticImage({ src, width, height, alt, eager = false }: { src: string; width: number; height: number; alt: string; eager?: boolean }) {
+  // These are versioned, same-origin brand assets. Direct URLs avoid relying on
+  // an edge image service for critical logos and launch artwork.
+  // eslint-disable-next-line @next/next/no-img-element
+  return <img src={src} width={width} height={height} alt={alt} loading={eager ? "eager" : "lazy"} decoding="async" />;
+}
+
 export function SiteHeader({ overlay = false }: { overlay?: boolean }) {
   return (
-    <header className={`site-header${overlay ? " site-header-overlay" : ""}`}>
-      <div className="nav-shell">
-        <Link className="wordmark" href="/" aria-label="PauseSure home">
-          <Image src="/brand/pausesure-logo.png" width={48} height={48} alt="" priority />
-          <span>PauseSure</span>
-        </Link>
-        <nav className="desktop-nav" aria-label="Primary navigation">
-          {primaryNavigation.map(([label, href]) => <Link href={href} key={href}>{label}</Link>)}
-        </nav>
-        <Link className="nav-cta desktop-cta" href="/company#contact">Contact <Arrow /></Link>
-        <details className="mobile-nav">
-          <summary aria-label="Open navigation"><span /><span /><span /></summary>
-          <nav aria-label="Mobile navigation">
+    <>
+      <a className="skip-link" href="#main-content">Skip to main content</a>
+      <header className={`site-header${overlay ? " site-header-overlay" : ""}`}>
+        <div className="nav-shell">
+          <Link className="wordmark" href="/" aria-label="PauseSure home">
+            <StaticImage src="/brand/pausesure-logo.webp" width={48} height={48} alt="" eager />
+            <span>PauseSure</span>
+          </Link>
+          <nav className="desktop-nav" aria-label="Primary navigation">
             {primaryNavigation.map(([label, href]) => <Link href={href} key={href}>{label}</Link>)}
-            <Link className="mobile-contact" href="/company#contact">Contact PauseSure</Link>
           </nav>
-        </details>
-      </div>
-    </header>
+          <Link className="nav-cta desktop-cta" href="/company#contact">Contact <Arrow /></Link>
+          <details className="mobile-nav">
+            <summary aria-label="Open navigation"><span /><span /><span /></summary>
+            <nav aria-label="Mobile navigation">
+              {primaryNavigation.map(([label, href]) => <Link href={href} key={href}>{label}</Link>)}
+              <Link className="mobile-contact" href="/company#contact">Contact PauseSure</Link>
+            </nav>
+          </details>
+        </div>
+      </header>
+    </>
   );
 }
 
@@ -43,7 +52,7 @@ export function SiteFooter() {
       <div className="footer-main">
         <div>
           <Link className="wordmark footer-wordmark" href="/">
-            <Image src="/brand/pausesure-logo.png" width={48} height={48} alt="" />
+            <StaticImage src="/brand/pausesure-logo.webp" width={48} height={48} alt="" />
             <span>PauseSure</span>
           </Link>
           <p>Calm decision support for suspicious requests.</p>

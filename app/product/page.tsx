@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
-import Image from "next/image";
 import Link from "next/link";
-import { Arrow, SiteFooter, SiteHeader } from "../site-shell";
+import { Arrow, SiteFooter, SiteHeader, StaticImage } from "../site-shell";
 
 export const metadata: Metadata = {
   title: "Product",
@@ -20,8 +19,9 @@ const inputs = [
 
 export default function ProductPage() {
   return (
-    <main className="inner-main">
+    <>
       <SiteHeader />
+      <main className="inner-main" id="main-content" tabIndex={-1}>
       <section className="page-hero product-page-hero">
         <div className="page-hero-copy">
           <p className="eyebrow"><span /> Product</p>
@@ -52,11 +52,12 @@ export default function ProductPage() {
       <section className="section product-family-section">
         <div className="product-family-copy"><p className="section-kicker">Two ways to use PauseSure</p><h2>Protect yourself or support someone you trust.</h2><p>The same product can reinforce personal independence or make a second opinion easier. Permissions remain understandable, selective, and reversible.</p><Link className="text-link" href="/how-it-works">Follow the full protection flow <Arrow /></Link></div>
         <div className="product-family-images">
-          <figure><Image src="/brand/protect-myself.png" width={1145} height={1374} alt="A woman reviewing a message on her phone" /><figcaption><strong>For me</strong><span>Stay in control</span></figcaption></figure>
-          <figure><Image src="/brand/help-someone.png" width={1536} height={1024} alt="A woman helping an older family member review a phone" /><figcaption><strong>For someone I trust</strong><span>Help without taking over</span></figcaption></figure>
+          <figure><StaticImage src="/brand/protect-myself.webp" width={900} height={1080} alt="A woman reviewing a message on her phone" /><figcaption><strong>For me</strong><span>Stay in control</span></figcaption></figure>
+          <figure><StaticImage src="/brand/help-someone.webp" width={1200} height={800} alt="A woman helping an older family member review a phone" /><figcaption><strong>For someone I trust</strong><span>Help without taking over</span></figcaption></figure>
         </div>
       </section>
+      </main>
       <SiteFooter />
-    </main>
+    </>
   );
 }

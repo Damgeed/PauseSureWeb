@@ -1,6 +1,5 @@
-import Image from "next/image";
 import Link from "next/link";
-import { Arrow, SiteFooter, SiteHeader } from "./site-shell";
+import { Arrow, SiteFooter, SiteHeader, StaticImage } from "./site-shell";
 
 const SignalIcon = ({ name }: { name: "pause" | "check" | "verify" | "circle" | "recover" }) => {
   const paths = {
@@ -15,11 +14,10 @@ const SignalIcon = ({ name }: { name: "pause" | "check" | "verify" | "circle" | 
 
 export default function Home() {
   return (
-    <main>
-      <a className="skip-link" href="#main-content">Skip to content</a>
+    <>
       <SiteHeader overlay />
-
-      <div id="main-content">
+      <main id="main-content" tabIndex={-1}>
+      <div>
         <section className="hero">
           <div className="hero-glow hero-glow-one" />
           <div className="hero-glow hero-glow-two" />
@@ -49,7 +47,7 @@ export default function Home() {
                 <div className="phone-bar"><span>9:41</span><span className="phone-island"/><span>● ●</span></div>
                 <div className="phone-content">
                   <div className="phone-brand">
-                    <Image src="/brand/pausesure-logo.png" width={52} height={52} alt="PauseSure logo" />
+                    <StaticImage src="/brand/pausesure-logo.webp" width={52} height={52} alt="PauseSure logo" />
                     <span>PauseSure</span>
                   </div>
                   <p className="phone-label">Suspicious request</p>
@@ -85,6 +83,31 @@ export default function Home() {
           </a>
         </section>
 
+        <section className="section demo-section" aria-labelledby="product-film-title">
+          <div className="demo-copy">
+            <p className="section-kicker">The product in 15 seconds</p>
+            <h2 id="product-film-title">A pause that leads somewhere.</h2>
+            <p>
+              The most useful protection products are fast to reach, easy to understand, and clear about what to do next.
+              PauseSure brings those strengths into one respectful flow—from the first uneasy feeling through verification,
+              trusted help, and recovery.
+            </p>
+            <ul className="demo-points">
+              <li><span>01</span><strong>Check the format you already have</strong><small>Message, link, screenshot, QR code, or supported audio.</small></li>
+              <li><span>02</span><strong>See the reasons and the limits</strong><small>Plain-language evidence without pretending uncertainty is certainty.</small></li>
+              <li><span>03</span><strong>Take a safer next step</strong><small>Verify elsewhere, ask someone you trust, or start a recovery plan.</small></li>
+            </ul>
+            <Link className="text-link" href="/product">Explore the product <Arrow /></Link>
+          </div>
+          <figure className="demo-film">
+            <video controls playsInline preload="metadata" poster="/pausesure-intro-poster.jpg" aria-label="PauseSure product introduction">
+              <source src="/pausesure-intro.mp4" type="video/mp4" />
+              Your browser does not support embedded video.
+            </video>
+            <figcaption>Design-approved interface preview. PauseSure is in active development for iPhone.</figcaption>
+          </figure>
+        </section>
+
         <section className="section" id="how-it-works">
           <div className="section-heading centered">
             <p className="section-kicker">A safer decision process</p>
@@ -110,11 +133,11 @@ export default function Home() {
         <section className="section split-section" id="families">
           <div className="family-visual">
             <div className="family-card family-card-one">
-              <Image src="/brand/protect-myself.png" width={430} height={516} alt="A woman checking a message on her phone" />
+              <StaticImage src="/brand/protect-myself.webp" width={430} height={516} alt="A woman checking a message on her phone" />
               <div><span>For me</span><strong>Stay in control</strong></div>
             </div>
             <div className="family-card family-card-two">
-              <Image src="/brand/help-someone.png" width={520} height={346} alt="A daughter helping an older family member review a message" />
+              <StaticImage src="/brand/help-someone.webp" width={520} height={346} alt="A daughter helping an older family member review a message" />
               <div><span>For someone I trust</span><strong>Help without taking over</strong></div>
             </div>
           </div>
@@ -176,7 +199,7 @@ export default function Home() {
         </section>
 
         <section className="launch-section" id="early-access">
-          <div className="launch-logo"><Image src="/brand/pausesure-logo.png" width={92} height={92} alt="PauseSure logo" /></div>
+          <div className="launch-logo"><StaticImage src="/brand/pausesure-logo.webp" width={92} height={92} alt="PauseSure logo" /></div>
           <p className="section-kicker light">Coming to iPhone</p>
           <h2>A calmer way to face suspicious requests.</h2>
           <p>PauseSure is in development. Bookmark this site for launch news, product updates, and practical scam-safety guidance.</p>
@@ -184,8 +207,8 @@ export default function Home() {
           <small>Never send passwords, verification codes, payment details, or sensitive case evidence by email.</small>
         </section>
       </div>
-
+      </main>
       <SiteFooter />
-    </main>
+    </>
   );
 }
