@@ -1,0 +1,62 @@
+import type { Metadata } from "next";
+import Image from "next/image";
+import Link from "next/link";
+import { Arrow, SiteFooter, SiteHeader } from "../site-shell";
+
+export const metadata: Metadata = {
+  title: "Product",
+  description: "Explore PauseSure's decision-support tools for suspicious messages, links, QR codes, screenshots, calls, and trusted-family support.",
+  alternates: { canonical: "/product" },
+};
+
+const inputs = [
+  ["Message", "Paste a text or email and review pressure, impersonation, payment, and secrecy signals."],
+  ["Link", "Inspect the destination and learn how to verify through an official channel you find independently."],
+  ["Screenshot", "Extract visible text from a selected screenshot and turn it into a readable review."],
+  ["QR code", "Read a code before following it, then separate the destination from the story around it."],
+  ["Call or voicemail", "Review supported audio locally where practical and keep the result in the same calm workflow."],
+  ["Trusted Circle", "Ask a chosen person for a second opinion without creating a surveillance dashboard."],
+];
+
+export default function ProductPage() {
+  return (
+    <main className="inner-main">
+      <SiteHeader />
+      <section className="page-hero product-page-hero">
+        <div className="page-hero-copy">
+          <p className="eyebrow"><span /> Product</p>
+          <h1>One calm place to check what feels off.</h1>
+          <p>PauseSure brings suspicious messages, links, screenshots, QR codes, calls, and family support into one decision process—without pretending uncertainty is certainty.</p>
+          <div className="hero-actions"><Link className="button button-primary" href="/how-it-works">See how it works <Arrow /></Link><Link className="button button-secondary" href="/safety">Safety by design</Link></div>
+        </div>
+        <div className="decision-console" aria-label="Example PauseSure review">
+          <div className="console-top"><span className="status-dot" /> Live decision support <small>Example</small></div>
+          <div className="console-message"><small>Suspicious request</small><strong>“Move your savings now to keep the account safe.”</strong></div>
+          <div className="console-signal"><span>01</span><div><strong>High-pressure timing</strong><p>The request tries to remove your time to verify.</p></div></div>
+          <div className="console-signal"><span>02</span><div><strong>Unusual money movement</strong><p>A legitimate fraud team should not ask you to move funds to a “safe” account.</p></div></div>
+          <div className="console-next"><small>Safer next step</small><strong>End the conversation. Open the bank&apos;s official app or call the number on your card.</strong></div>
+        </div>
+      </section>
+
+      <section className="metric-band">
+        <div><strong>5</strong><span>check formats in one flow</span></div><div><strong>1</strong><span>consistent action language</span></div><div><strong>0</strong><span>advertising or data selling</span></div><div><strong>You</strong><span>control what gets shared</span></div>
+      </section>
+
+      <section className="section page-section">
+        <div className="section-heading"><p className="section-kicker">A connected toolkit</p><h2>Built around the moment a decision changes.</h2><p>Each tool feeds the same sequence: pause, inspect, verify elsewhere, involve someone if useful, and recover quickly if something happened.</p></div>
+        <div className="capability-grid">
+          {inputs.map(([title, body], index) => <article key={title}><span>{String(index + 1).padStart(2, "0")}</span><h3>{title}</h3><p>{body}</p></article>)}
+        </div>
+      </section>
+
+      <section className="section product-family-section">
+        <div className="product-family-copy"><p className="section-kicker">Two ways to use PauseSure</p><h2>Protect yourself or support someone you trust.</h2><p>The same product can reinforce personal independence or make a second opinion easier. Permissions remain understandable, selective, and reversible.</p><Link className="text-link" href="/how-it-works">Follow the full protection flow <Arrow /></Link></div>
+        <div className="product-family-images">
+          <figure><Image src="/brand/protect-myself.png" width={1145} height={1374} alt="A woman reviewing a message on her phone" /><figcaption><strong>For me</strong><span>Stay in control</span></figcaption></figure>
+          <figure><Image src="/brand/help-someone.png" width={1536} height={1024} alt="A woman helping an older family member review a phone" /><figcaption><strong>For someone I trust</strong><span>Help without taking over</span></figcaption></figure>
+        </div>
+      </section>
+      <SiteFooter />
+    </main>
+  );
+}
