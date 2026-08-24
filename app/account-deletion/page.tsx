@@ -1,15 +1,16 @@
-import type { Metadata } from "next";
 import LegalShell from "../legal-shell";
+import { pageMetadata } from "../page-metadata";
 
-export const metadata: Metadata = { title: "Account deletion", description: "How PauseSure account deletion is designed to work." };
+export const metadata = pageMetadata({ title: "Account Deletion", description: "How to request deletion of a PauseSure account and what deletion covers.", path: "/account-deletion" });
 
 export default function AccountDeletion() {
-  return <LegalShell title="Delete your PauseSure account." intro="PauseSure is pre-release. This page documents the deletion control being built for connected accounts and will provide a live request path before launch.">
-    <p className="legal-date">Development process · 24 August 2026</p>
-    <div className="legal-notice">There are currently no general-release consumer accounts. If you are an authorized tester, use the in-app account deletion control first.</div>
-    <h2>Planned in-app process</h2><ol><li>Open PauseSure and go to Settings → Account.</li><li>Select Delete account.</li><li>Reauthenticate with Apple and confirm deletion.</li><li>The service revokes the connected Apple authorization before deleting account-linked server records.</li></ol>
-    <h2>What deletion covers</h2><p>Account-linked sessions, device registrations, encrypted backup, Circle relationships, invitations, requests, responses, and stored authorization material are designed to be removed by database cascade. Local records may require deleting them in the app or removing the app from the device.</p>
-    <h2>If the app is unavailable</h2><p>Authorized testers may email <a href="mailto:privacy@pausesure.com?subject=Account%20deletion">privacy@pausesure.com</a> from the address associated with their test access. Do not send identity tokens, passwords, or one-time codes. We may need a safe verification step before acting.</p>
-    <h2>Important limitation</h2><p>Backup and security logs may be retained only for the short period required by the documented retention and restore policy, then expire. Aggregated data that cannot identify an account may not be capable of being tied back to a deletion request.</p>
+  return <LegalShell title="Delete your PauseSure account." intro="Account deletion should be easy to start, clear about what it covers, and confirmed when complete.">
+    <p className="legal-date">Account deletion · Updated 25 August 2026</p>
+    <div className="legal-notice">PauseSure does not currently offer general public accounts. Authorized testers can use the in-app control when available or request assistance through the privacy contact below.</div>
+    <h2>Delete an account in the app</h2><ol><li>Open PauseSure and go to Settings → Account.</li><li>Select Delete account.</li><li>Review what will be removed and confirm the request.</li><li>Complete any safe reauthentication step shown by the app.</li></ol>
+    <h2>Request assistance</h2><p>If the app is unavailable or the in-app control cannot be completed, authorized testers should use the verified private support route supplied with their access. Do not send passwords, Apple credentials, identity tokens, payment details, or one-time codes. PauseSure may need a proportionate verification step and will communicate the expected completion date after verification.</p>
+    <h2>What deletion covers</h2><p>A completed deletion request covers the account record and account-linked service data that PauseSure is not legally required to retain. The confirmation process identifies any device-local records or exports that must be removed separately.</p>
+    <h2>Retention exceptions</h2><p>Limited records may remain temporarily when needed for security, fraud prevention, backup integrity, dispute handling, or a legal obligation. Applicable retention and deletion behavior must be documented for the released service. Data that has been irreversibly de-identified cannot be linked back to an account-deletion request.</p>
+    <h2>Confirmation</h2><p>PauseSure will confirm when the account request has been completed or explain what additional action is required.</p>
   </LegalShell>;
 }

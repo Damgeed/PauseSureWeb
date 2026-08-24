@@ -44,9 +44,14 @@ The production site is published at [pausesure.com](https://pausesure.com). Host
 
 Do not add analytics, advertising pixels, form collection, authentication, or third-party scripts without first updating the privacy review, security review, App Store disclosures where relevant, and public policy pages.
 
+## Release state
+
+`app/release.ts` is the single source of truth for public iPhone availability, download actions, the Company status, homepage FAQ, and footer language. Do not hard-code availability elsewhere. Switch the state to `app-store` only after a verified `https://apps.apple.com/` listing resolves and the release, privacy, security, support, and account-deletion reviews are complete.
+
 ## Operating documents
 
 - [App ↔ web synchronization](docs/APP_WEB_SYNC.md)
+- [Public claim matrix](docs/PUBLIC_CLAIM_MATRIX.md)
 - [Roadmap to one million users](docs/GROWTH_TO_ONE_MILLION.md)
 - [Security reporting](SECURITY.md)
 
@@ -56,4 +61,4 @@ Do not add analytics, advertising pixels, form collection, authentication, or th
 - Primary navy: `#031b49`
 - Use the supplied PauseSure brand artwork. Do not regenerate or stylize the logo without approval.
 
-PauseSure is in active development. Public product claims must describe shipped, verified behavior and must never guarantee that a request is safe.
+Public product claims must describe verified behavior, distinguish examples from live features, and never guarantee that a request is safe.

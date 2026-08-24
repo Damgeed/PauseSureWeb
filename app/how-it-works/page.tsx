@@ -1,8 +1,8 @@
-import type { Metadata } from "next";
 import Link from "next/link";
+import { pageMetadata } from "../page-metadata";
 import { Arrow, SiteFooter, SiteHeader } from "../site-shell";
 
-export const metadata: Metadata = { title: "How It Works", description: "See the PauseSure five-step protection flow from pressure interruption to independent verification and recovery.", alternates: { canonical: "/how-it-works" } };
+export const metadata = pageMetadata({ title: "How It Works", description: "See the PauseSure five-step protection flow from pressure interruption to independent verification and recovery.", path: "/how-it-works" });
 
 const steps = [
   ["Pause", "Break contact with the pressure before replying, clicking, paying, or sharing."],
