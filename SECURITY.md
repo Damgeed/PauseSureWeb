@@ -4,7 +4,13 @@ PauseSure welcomes responsible reports that help protect people using the websit
 
 ## Reporting
 
-Email `security@pausesure.com` with:
+PauseSure does not currently publish an email address for security reports because
+domain email is not yet operational. Authorized testers should use the verified
+private channel included with their test invitation. A monitored public reporting
+route will be published at [pausesure.com/security](https://pausesure.com/security)
+before general app distribution.
+
+When reporting, include:
 
 - the affected URL, app version, or component;
 - a concise description of the issue and likely impact;
@@ -24,4 +30,4 @@ Do not include passwords, payment information, government identifiers, private s
 
 The current public website and the latest supported PauseSure app release are in scope. Third-party services and issues that require tricking a person are out of scope, but useful reports may still be redirected to the appropriate provider.
 
-PauseSure will acknowledge credible reports when the mailbox is operational, assess severity, and coordinate remediation and disclosure. This policy is not a promise of payment and does not authorize activity that would be unlawful or harmful.
+PauseSure will acknowledge credible reports through the verified reporting channel, assess severity, and coordinate remediation and disclosure. This policy is not a promise of payment and does not authorize activity that would be unlawful or harmful.
