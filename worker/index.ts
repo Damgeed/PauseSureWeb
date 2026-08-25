@@ -71,7 +71,7 @@ const worker = {
     if (!isLocalDevelopment && (url.protocol !== "https:" || hostname === "www.pausesure.com")) {
       return withSecurityHeaders(canonicalRedirect(url));
     }
-    if (!isLocalDevelopment && hostname !== "pausesure.com") {
+    if (!isLocalDevelopment && url.origin !== canonicalOrigin) {
       return withSecurityHeaders(new Response("Misdirected Request", { status: 421 }));
     }
 
@@ -79,7 +79,7 @@ const worker = {
       return withSecurityHeaders(await handlePrivacyEvents(request, env));
     }
 
-    if (url.pathname === "/_vinext/image") {
+    if (url.pathname === "/_vinext/image" || url.pathname === "/_next/image") {
       return withSecurityHeaders(new Response("Not Found", { status: 404 }));
     }
 

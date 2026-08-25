@@ -60,23 +60,31 @@ test("redirects every production HTTP and www request to the fixed HTTPS origin"
     assert.match(response.headers.get("content-security-policy") ?? "", /frame-ancestors 'none'/);
   }
 
-  const unexpectedHost = await worker.fetch(new Request("https://pausesure-web.example.workers.dev/"), env, ctx);
-  assert.equal(unexpectedHost.status, 421);
-  for (const [header, expected] of [
-    ["content-security-policy", /default-src 'self'/],
-    ["cross-origin-opener-policy", "same-origin"],
-    ["permissions-policy", /camera=\(\)/],
-    ["referrer-policy", "strict-origin-when-cross-origin"],
-    ["strict-transport-security", "max-age=31536000"],
-    ["x-content-type-options", "nosniff"],
-    ["x-frame-options", "DENY"],
-  ]) {
-    const value = unexpectedHost.headers.get(header) ?? "";
-    if (expected instanceof RegExp) assert.match(value, expected, `${header} should protect 421 responses`);
-    else assert.equal(value, expected, `${header} should protect 421 responses`);
+  const unexpectedOrigins = [
+    "https://pausesure-web.example.workers.dev/",
+    "https://pausesure.com:8443/",
+  ];
+  for (const requestUrl of unexpectedOrigins) {
+    const unexpectedOrigin = await worker.fetch(new Request(requestUrl), env, ctx);
+    assert.equal(unexpectedOrigin.status, 421);
+    for (const [header, expected] of [
+      ["content-security-policy", /default-src 'self'/],
+      ["cross-origin-opener-policy", "same-origin"],
+      ["permissions-policy", /camera=\(\)/],
+      ["referrer-policy", "strict-origin-when-cross-origin"],
+      ["strict-transport-security", "max-age=31536000"],
+      ["x-content-type-options", "nosniff"],
+      ["x-frame-options", "DENY"],
+    ]) {
+      const value = unexpectedOrigin.headers.get(header) ?? "";
+      if (expected instanceof RegExp) assert.match(value, expected, `${header} should protect 421 responses`);
+      else assert.equal(value, expected, `${header} should protect 421 responses`);
+    }
   }
 
-  const unusedImageRoute = await worker.fetch(new Request("https://pausesure.com/_vinext/image?url=/icon.png&w=64&q=75"), env, ctx);
-  assert.equal(unusedImageRoute.status, 404);
-  assert.equal(unusedImageRoute.headers.get("x-content-type-options"), "nosniff");
+  for (const path of ["/_vinext/image", "/_next/image"]) {
+    const unusedImageRoute = await worker.fetch(new Request(`https://pausesure.com${path}?url=/icon.png&w=64&q=75`), env, ctx);
+    assert.equal(unusedImageRoute.status, 404);
+    assert.equal(unusedImageRoute.headers.get("x-content-type-options"), "nosniff");
+  }
 });
