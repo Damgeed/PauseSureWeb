@@ -20,4 +20,9 @@ The exception must be reviewed and either removed or renewed when any of these o
 - PauseSure begins processing server-side or otherwise untrusted images; or
 - the Vinext migration is otherwise scheduled.
 
-`npm run audit:full` enforces the exact reviewed package versions and advisory set. For compatibility with npm's version-dependent output, it accepts only `false` or the exact `vinext@1.0.0-beta.8` semver-major remediation object. It fails closed for any new high/critical finding, changed exception, or other remediation so that a maintainer must reassess this record.
+`npm run audit:full` enforces the exact reviewed package versions, advisory set,
+severity, remediation result, and aggregate counts. For compatibility with
+npm's version-dependent output, it accepts only `false` or the exact
+`vinext@1.0.0-beta.8` semver-major remediation object. It fails closed for any
+new finding at any severity, changed exception, or other remediation so that a
+maintainer must reassess this record.

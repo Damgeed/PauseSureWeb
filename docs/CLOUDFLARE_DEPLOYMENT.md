@@ -10,11 +10,12 @@ does not require a hosted site builder or a separate application server.
 - D1 binding: `DB`
 - D1 database: `pausesure-web-analytics`
 - Static-assets binding: `ASSETS`
-- Cloudflare Images binding: `IMAGES`
+- Rate-limit binding: `ANALYTICS_RATE_LIMITER`
+- Daily retention-cleanup cron
 - Custom domains: `pausesure.com` and `www.pausesure.com`
 
-The Worker permanently redirects `www.pausesure.com` to the apex domain while
-preserving the path and query string.
+The Worker permanently redirects HTTP and `www.pausesure.com` to the fixed
+`https://pausesure.com` origin while preserving the path and query string.
 
 ## Before the first deployment
 
@@ -26,6 +27,8 @@ preserving the path and query string.
    has a conflicting CNAME.
 3. Confirm the production branch in GitHub contains `wrangler.jsonc` and that
    its Worker name is `pausesure-web`.
+4. In **SSL/TLS → Edge Certificates**, enable **Always Use HTTPS**. The Worker
+   also enforces HTTPS, but the zone rule provides an independent edge control.
 
 No API token or other credential belongs in GitHub. Cloudflare account IDs and
 D1 UUIDs are identifiers rather than secrets, but this repository intentionally
@@ -48,10 +51,12 @@ can create the D1 database because the initial configuration omits
    | Root directory | `/` (leave blank unless this app is moved into a monorepo) |
    | Build command | `npm run build` |
    | Deploy command | `npm run deploy:built` |
-   | Non-production deploy command | `npm run upload:built` |
+   | Non-production deploy command | Leave disabled for the production configuration |
 
-4. Enable non-production branch builds if pull-request preview versions are
-   desired.
+4. Keep non-production branch builds disabled. `workers_dev` and preview URLs
+   are intentionally off so a preview cannot write to the production D1
+   binding or bypass custom-domain controls. A future preview environment must
+   use separate bindings and Cloudflare Access.
 5. Select **Save and Deploy**. The Worker name in Cloudflare must exactly match
    the `name` in `wrangler.jsonc`.
 
@@ -99,22 +104,33 @@ Use the migration command rather than pasting SQL into the dashboard; that
 keeps Cloudflare's `d1_migrations` history accurate.
 
 Future schema changes should be backward compatible and applied before code
-that requires them is promoted to production.
+that requires them is promoted to production. Migrations are reviewed SQL files;
+the production site does not ship an ORM or schema-generation runtime.
 
 ## Verify the cutover
 
 ```bash
 curl -I https://pausesure.com/
+curl -I http://pausesure.com/
 curl -I 'https://www.pausesure.com/resources?from=www'
+curl -I 'http://www.pausesure.com/resources?from=www'
 curl -s https://pausesure.com/robots.txt
 ```
 
 Expected results:
 
 - `pausesure.com` returns `200` and PauseSure security headers.
-- `www.pausesure.com` returns `308` with a `Location` on
-  `https://pausesure.com` preserving the path and query.
+- Both HTTP requests and `www.pausesure.com` return `308` with a `Location` on
+  `https://pausesure.com` preserving the path and query. No response serves the
+  application over HTTP.
+- HTTPS HTML responses include the enforced Content Security Policy from the
+  current source, and `/icon.png` matches the current rounded repository icon.
 - The Cloudflare deployment page shows both Custom Domains as active.
+- The Worker shows the `ANALYTICS_RATE_LIMITER` binding and the daily retention
+  cron from `wrangler.jsonc`.
+- The active production deployment identifies the reviewed `main` commit and
+  its CI run completed successfully. Do not treat a preview or uploaded version
+  as production promotion.
 
 To verify the content-free analytics endpoint without sending user content,
 opt in on `/check`, complete a synthetic test, and confirm one aggregate row in
@@ -126,15 +142,16 @@ or free-form text.
 
 ```bash
 npm ci
-npm run lint
-npm test
-npm run deploy:dry-run
+npm run audit:signatures
+npm run verify
 npm run db:migrate:local
 ```
 
 `npm run dev` uses the local Workers runtime. `npm run preview` builds and runs
 the production Worker locally. `npm run deploy` is the authenticated manual
-equivalent of the Git-connected build and deploy sequence.
+equivalent of the Git-connected build and deploy sequence. Every deploy command
+runs dependency audits, lint, type checking, the test suite, and a Wrangler dry
+run before it can publish.
 
 ## Rollback
 

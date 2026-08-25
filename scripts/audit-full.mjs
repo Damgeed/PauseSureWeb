@@ -85,19 +85,15 @@ if (report.auditReportVersion !== 2 || !report.vulnerabilities || !report.metada
 }
 
 const lock = JSON.parse(readFileSync(new URL("../package-lock.json", import.meta.url), "utf8"));
-const highOrCritical = new Map(
-  Object.entries(report.vulnerabilities).filter(([, vulnerability]) =>
-    ["high", "critical"].includes(vulnerability.severity),
-  ),
-);
+const reviewedFindings = new Map(Object.entries(report.vulnerabilities));
 
-const unexpected = [...highOrCritical.keys()].filter((name) => !expectedExceptions.has(name));
+const unexpected = [...reviewedFindings.keys()].filter((name) => !expectedExceptions.has(name));
 if (unexpected.length > 0) {
-  fail(`unreviewed high/critical findings: ${unexpected.join(", ")}.`);
+  fail(`unreviewed findings at any severity: ${unexpected.join(", ")}.`);
 }
 
 for (const [name, expected] of expectedExceptions) {
-  const vulnerability = highOrCritical.get(name);
+  const vulnerability = reviewedFindings.get(name);
   if (!vulnerability) {
     fail(`${name} no longer matches its exception; remove or re-review the exception.`);
   }
@@ -133,6 +129,12 @@ if (audit.status !== 0 && audit.status !== 1) {
 }
 
 const counts = report.metadata.vulnerabilities;
+if (counts.critical !== 0 || counts.high !== 2 || counts.moderate !== 0 || counts.low !== 0 || counts.info !== 0) {
+  fail(
+    "aggregate advisory counts changed and must be reviewed.",
+    `Current report: ${JSON.stringify(counts)}`,
+  );
+}
 console.log(
   `Full dependency audit passed with only reviewed exceptions: image-size@2.0.2 and vinext@0.0.50. ` +
     `Current report: ${counts.critical} critical, ${counts.high} high, ${counts.moderate} moderate, ${counts.low} low.`,

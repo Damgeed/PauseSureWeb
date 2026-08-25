@@ -33,11 +33,14 @@ npm run dev
 Quality checks:
 
 ```bash
-npm run lint
-npm test
+npm run audit:signatures
+npm run verify
 ```
 
-`npm test` builds the deployable worker and checks that the public routes render successfully.
+`npm run verify` audits dependencies, lints, type-checks, builds and tests the
+deployable Worker, and validates the Wrangler deployment bundle without
+publishing it. Local development binds only to `127.0.0.1`; production requests
+are restricted to the canonical HTTPS origin by the Worker.
 
 ## Deployment
 

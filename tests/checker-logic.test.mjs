@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { analyzeLink, analyzePhone, analyzeText } from "../app/check/checker.ts";
+import { analyzeCheck, analyzeLink, analyzePhone, analyzeText } from "../app/check/checker.ts";
 
 test("flags combined pressure, payment, and secrecy without declaring certainty", () => {
   const result = analyzeText("Act now. Buy gift cards and do not tell anyone. Send the codes immediately.");
@@ -55,6 +55,42 @@ test("does not turn arbitrary text into a web address", () => {
 test("inspects a bare www address when it appears inside message text", () => {
   const result = analyzeText("Please sign in at www.example.com/account/verify");
   assert.ok(result.signals.some((item) => item.code === "sensitive_path"));
+});
+
+test("analyzes decoded QR destinations as links", () => {
+  const cases = [
+    ["example.com/account/verify", "sensitive_path"],
+    ["bit.ly/reset", "short_link"],
+    ["javascript:alert(1)", "invalid_link"],
+  ];
+
+  for (const [value, expectedSignal] of cases) {
+    const result = analyzeCheck("qr", value);
+    assert.ok(result.signals.some((item) => item.code === expectedSignal), `${value} should produce ${expectedSignal}`);
+    assert.notEqual(result.risk, "insufficient", `${value} should not lose its link warning in the QR flow`);
+  }
+});
+
+test("inspects later links instead of allowing a benign first-link bypass", () => {
+  const result = analyzeText(
+    "Read https://safe.example first, then use http://trusted.example@192.0.2.9:8080/account/verify",
+  );
+
+  assert.equal(result.risk, "high");
+  assert.ok(result.signals.some((item) => item.code === "embedded_identity"));
+  assert.ok(result.signals.some((item) => item.code === "ip_host"));
+});
+
+test("recognizes shortened destinations with a www prefix", () => {
+  const result = analyzeLink("https://www.bit.ly/reset");
+  assert.ok(result.signals.some((item) => item.code === "short_link"));
+});
+
+test("warns when a message exceeds the bounded link inspection limit", () => {
+  const links = Array.from({ length: 9 }, (_, index) => `https://example${index}.com`).join(" ");
+  const result = analyzeText(links);
+  assert.ok(result.signals.some((item) => item.code === "many_links"));
+  assert.notEqual(result.risk, "insufficient");
 });
 
 test("does not claim a phone number proves identity", () => {

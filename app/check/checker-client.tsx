@@ -12,6 +12,10 @@ const kinds: Array<{ id: WebCheckKind; label: string; description: string }> = [
 ];
 
 const analyticsPreferenceKey = "pausesure_content_free_analytics";
+const allowedImageTypes = new Set(["image/avif", "image/jpeg", "image/png", "image/webp"]);
+const maximumImageBytes = 12 * 1024 * 1024;
+const maximumImageDimension = 8_192;
+const maximumImagePixels = 25_000_000;
 
 type AnalyticsDimensions = Partial<Record<"input" | "risk" | "action" | "channel", string>>;
 
@@ -33,10 +37,6 @@ function track(name: string, dimensions: AnalyticsDimensions, enabled: boolean) 
     keepalive: true,
     credentials: "same-origin",
   }).catch(() => undefined);
-}
-
-function inputDimension(kind: WebCheckKind) {
-  return kind === "screenshot" || kind === "qr" ? kind : kind;
 }
 
 export default function CheckerClient() {
@@ -69,11 +69,11 @@ export default function CheckerClient() {
   }
 
   function runCheck() {
-    track("web_check_started", { input: inputDimension(kind) }, analyticsEnabled);
+    track("web_check_started", { input: kind }, analyticsEnabled);
     const next = analyzeCheck(kind, value);
     setResult(next);
-    track("web_check_completed", { input: inputDimension(kind), risk: next.risk }, analyticsEnabled);
-    track("result_viewed", { input: inputDimension(kind), risk: next.risk }, analyticsEnabled);
+    track("web_check_completed", { input: kind, risk: next.risk }, analyticsEnabled);
+    track("result_viewed", { input: kind, risk: next.risk }, analyticsEnabled);
   }
 
   async function inspectImage(file: File | undefined) {
@@ -85,24 +85,37 @@ export default function CheckerClient() {
       setImageUrl(null);
       return;
     }
-    if (!file.type.startsWith("image/") || file.size > 12 * 1024 * 1024) {
+    if (!allowedImageTypes.has(file.type.toLowerCase()) || file.size > maximumImageBytes) {
       setImageUrl(null);
-      setImageStatus("Choose an image file smaller than 12 MB.");
+      setImageStatus("Choose a PNG, JPEG, WebP, or AVIF image smaller than 12 MB.");
       return;
     }
-    setImageUrl(URL.createObjectURL(file));
-    setImageStatus("The image remains on this device. Paste the visible wording below for a message check.");
 
-    if (kind !== "qr") return;
+    let bitmap: ImageBitmap | null = null;
+    let previewReady = false;
     try {
+      bitmap = await createImageBitmap(file);
+      if (
+        bitmap.width > maximumImageDimension ||
+        bitmap.height > maximumImageDimension ||
+        bitmap.width * bitmap.height > maximumImagePixels
+      ) {
+        setImageUrl(null);
+        setImageStatus("Choose an image with smaller pixel dimensions.");
+        return;
+      }
+
+      setImageUrl(URL.createObjectURL(file));
+      previewReady = true;
+      setImageStatus("The image remains on this device. Paste the visible wording below for a message check.");
+      if (kind !== "qr") return;
+
       const Detector = (globalThis as unknown as { BarcodeDetector?: new (options: { formats: string[] }) => { detect(source: ImageBitmap): Promise<Array<{ rawValue: string }>> } }).BarcodeDetector;
       if (!Detector) {
         setImageStatus("This browser cannot decode QR codes locally. Use the PauseSure iPhone QR scanner or paste the destination shown by your camera.");
         return;
       }
-      const bitmap = await createImageBitmap(file);
       const matches = await new Detector({ formats: ["qr_code"] }).detect(bitmap);
-      bitmap.close();
       if (!matches[0]?.rawValue) {
         setImageStatus("No QR destination was found. Try a sharper image or use the PauseSure iPhone QR scanner.");
         return;
@@ -110,7 +123,12 @@ export default function CheckerClient() {
       setValue(matches[0].rawValue);
       setImageStatus("QR content decoded on this device. Review the destination before checking it.");
     } catch {
-      setImageStatus("The QR code could not be decoded locally. Use the PauseSure iPhone QR scanner or paste the destination.");
+      if (!previewReady) setImageUrl(null);
+      setImageStatus(kind === "qr"
+        ? "The QR code could not be decoded locally. Use the PauseSure iPhone QR scanner or paste the destination."
+        : "The image could not be read safely. Try a different PNG, JPEG, WebP, or AVIF file.");
+    } finally {
+      bitmap?.close();
     }
   }
 
@@ -149,7 +167,7 @@ export default function CheckerClient() {
           {needsImage && <div className="image-input-row">
             <label className="image-picker">
               <span>{kind === "qr" ? "Choose a QR image" : "Choose a screenshot"}</span>
-              <input type="file" accept="image/*" onChange={(event) => void inspectImage(event.target.files?.[0])} />
+              <input type="file" accept="image/png,image/jpeg,image/webp,image/avif" onChange={(event) => void inspectImage(event.target.files?.[0])} />
             </label>
             {/* A user-selected blob URL never leaves this browser and is not compatible with the site image optimizer. */}
             {/* eslint-disable-next-line @next/next/no-img-element */}
