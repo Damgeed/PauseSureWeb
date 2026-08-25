@@ -31,7 +31,7 @@ export default function Home() {
                 and involve someone you trust—before money or information leaves your hands.
               </p>
               <div className="hero-actions">
-                <Link className="button button-primary" href="/product">Explore PauseSure <Arrow /></Link>
+                <Link className="button button-primary" href="/check">Check something now <Arrow /></Link>
                 <ReleaseLink className="button button-secondary" />
               </div>
               <div className="hero-assurances" aria-label="Product principles">

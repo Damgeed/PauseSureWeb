@@ -2,6 +2,7 @@ import Link from "next/link";
 import { releaseAction, releaseMessaging } from "./release";
 
 const primaryNavigation = [
+  ["Check now", "/check"],
   ["Product", "/product"],
   ["How it works", "/how-it-works"],
   ["Safety & privacy", "/safety"],
@@ -75,7 +76,7 @@ export function SiteFooter() {
           </Link>
           <p>Calm decision support for suspicious requests.</p>
         </div>
-        <div className="footer-column"><strong>Product</strong><Link href="/product">Overview</Link><Link href="/how-it-works">How it works</Link><Link href="/safety">Safety & privacy</Link></div>
+        <div className="footer-column"><strong>Product</strong><Link href="/check">Check now</Link><Link href="/product">Overview</Link><Link href="/how-it-works">How it works</Link><Link href="/safety">Safety & privacy</Link></div>
         <div className="footer-column"><strong>Learn</strong><Link href="/resources">Resources</Link><Link href="/security">Security</Link><Link href="/support">Support</Link></div>
         <div className="footer-column"><strong>Company</strong><Link href="/company">About</Link><Link href="/company#contact">Contact</Link><Link href="/account-deletion">Account deletion</Link></div>
       </div>

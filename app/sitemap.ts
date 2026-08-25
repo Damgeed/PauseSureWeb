@@ -1,7 +1,7 @@
 import type { MetadataRoute } from "next";
 
 export default function sitemap(): MetadataRoute.Sitemap {
-  const primary = ["", "/product", "/how-it-works", "/safety", "/resources", "/company"];
+  const primary = ["", "/check", "/product", "/how-it-works", "/safety", "/resources", "/company"];
   const support = ["/privacy", "/security", "/terms", "/support", "/account-deletion"];
   return [...primary, ...support].map((route) => ({
     url: `https://pausesure.com${route}`,

@@ -8,7 +8,7 @@ test("renders the public multi-page company site", async () => {
   const { default: worker } = await import(workerUrl.href);
   const env = { ASSETS: { fetch: async () => new Response("Not found", { status: 404 }) } };
   const ctx = { waitUntil() {}, passThroughOnException() {} };
-  const routes = ["/", "/product", "/how-it-works", "/safety", "/resources", "/company", "/privacy", "/security", "/terms", "/support", "/account-deletion"];
+  const routes = ["/", "/check", "/product", "/how-it-works", "/safety", "/resources", "/company", "/privacy", "/security", "/terms", "/support", "/account-deletion"];
   const releaseSource = await readFile(new URL("../app/release.ts", import.meta.url), "utf8");
   const appStoreEnabled = /stage:\s*"app-store",/.test(releaseSource);
 
@@ -44,6 +44,46 @@ test("renders the public multi-page company site", async () => {
   const missing = await worker.fetch(new Request("http://localhost/not-a-pause-sure-page", { headers: { accept: "text/html" } }), env, ctx);
   assert.equal(missing.status, 404, "unknown routes should return a real 404");
   assert.match(await missing.text(), /This link does not lead to a PauseSure page/i);
+});
+
+test("accepts only same-origin, allowlisted, content-free analytics", async () => {
+  const workerUrl = new URL("../dist/server/index.js", import.meta.url);
+  workerUrl.searchParams.set("analytics-test", `${process.pid}-${Date.now()}`);
+  const { default: worker } = await import(workerUrl.href);
+  const batches = [];
+  const DB = {
+    prepare(sql) {
+      return { bind(...values) { return { sql, values }; } };
+    },
+    async batch(statements) { batches.push(statements); return statements.map(() => ({ success: true })); },
+  };
+  const env = { ASSETS: { fetch: async () => new Response("Not found", { status: 404 }) }, DB };
+  const ctx = { waitUntil() {}, passThroughOnException() {} };
+  const day = new Date().toISOString().slice(0, 10);
+  const validBody = { events: [{ schemaVersion: 1, name: "web_check_completed", day, count: 1, dimensions: { input: "link", risk: "high", channel: "web" } }] };
+  const valid = await worker.fetch(new Request("http://localhost/api/privacy-events", {
+    method: "POST",
+    headers: { origin: "http://localhost", "content-type": "application/json" },
+    body: JSON.stringify(validBody),
+  }), env, ctx);
+  assert.equal(valid.status, 204);
+  assert.equal(batches.length, 1);
+  assert.equal(batches[0].length, 2, "retention cleanup and aggregate upsert should run");
+  assert.ok(batches[0][1].values.every((value) => !String(value).includes("http")), "aggregate values should contain no checked URL");
+
+  const identifying = await worker.fetch(new Request("http://localhost/api/privacy-events", {
+    method: "POST",
+    headers: { origin: "http://localhost", "content-type": "application/json" },
+    body: JSON.stringify({ events: [{ ...validBody.events[0], rawContent: "secret message" }] }),
+  }), env, ctx);
+  assert.equal(identifying.status, 400);
+
+  const crossOrigin = await worker.fetch(new Request("http://localhost/api/privacy-events", {
+    method: "POST",
+    headers: { origin: "https://attacker.example", "content-type": "application/json" },
+    body: JSON.stringify(validBody),
+  }), env, ctx);
+  assert.equal(crossOrigin.status, 403);
 });
 
 test("ships optimized brand imagery and product film", async () => {
