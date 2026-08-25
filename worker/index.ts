@@ -51,6 +51,11 @@ const worker = {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
 
+    if (url.hostname.toLowerCase() === "www.pausesure.com") {
+      url.hostname = "pausesure.com";
+      return withSecurityHeaders(Response.redirect(url.toString(), 308));
+    }
+
     if (url.pathname === "/api/privacy-events") {
       return withSecurityHeaders(await handlePrivacyEvents(request, env));
     }
