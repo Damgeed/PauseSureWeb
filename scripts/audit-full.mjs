@@ -8,7 +8,10 @@ const expectedExceptions = new Map([
       direct: false,
       version: "2.0.2",
       advisories: new Set(["GHSA-5p2g-fcmc-qvqq", "GHSA-w3rx-r6r6-pgpr"]),
-      fix: false,
+      fixes: [
+        false,
+        { name: "vinext", version: "1.0.0-beta.8", isSemVerMajor: true },
+      ],
     },
   ],
   [
@@ -17,7 +20,10 @@ const expectedExceptions = new Map([
       direct: true,
       version: "0.0.50",
       advisories: new Set(["image-size"]),
-      fix: false,
+      fixes: [
+        false,
+        { name: "vinext", version: "1.0.0-beta.8", isSemVerMajor: true },
+      ],
     },
   ],
 ]);
@@ -48,12 +54,14 @@ function sameSet(left, right) {
 
 function sameFix(actual, expected) {
   if (typeof expected !== "object" || expected === null) return Object.is(actual, expected);
+  if (!actual || typeof actual !== "object" || Array.isArray(actual)) return false;
+
+  const actualKeys = Object.keys(actual).sort();
+  const expectedKeys = Object.keys(expected).sort();
   return (
-    actual &&
-    typeof actual === "object" &&
-    actual.name === expected.name &&
-    actual.version === expected.version &&
-    actual.isSemVerMajor === expected.isSemVerMajor
+    actualKeys.length === expectedKeys.length &&
+    actualKeys.every((key, index) => key === expectedKeys[index]) &&
+    expectedKeys.every((key) => Object.is(actual[key], expected[key]))
   );
 }
 
@@ -111,10 +119,11 @@ for (const [name, expected] of expectedExceptions) {
     );
   }
 
-  if (!sameFix(vulnerability.fixAvailable, expected.fix)) {
+  if (!expected.fixes.some((fix) => sameFix(vulnerability.fixAvailable, fix))) {
     fail(
       `${name} remediation options changed and must be re-reviewed.`,
-      `Expected: ${JSON.stringify(expected.fix)}\nActual: ${JSON.stringify(vulnerability.fixAvailable)}`,
+      `Expected one of: ${expected.fixes.map((fix) => JSON.stringify(fix)).join(", ")}\n` +
+        `Actual: ${JSON.stringify(vulnerability.fixAvailable)}`,
     );
   }
 }
