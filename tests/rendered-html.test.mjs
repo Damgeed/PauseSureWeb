@@ -63,3 +63,12 @@ test("ships optimized brand imagery and product film", async () => {
   assert.equal(video.subarray(4, 8).toString("ascii"), "ftyp", "the product film should be a valid MP4");
   assert.ok(video.length > 250_000, "the product film should contain real optimized video data");
 });
+
+test("keeps navigation visible without hiding anchored content", async () => {
+  const css = await readFile(new URL("../app/globals.css", import.meta.url), "utf8");
+  assert.match(css, /\.site-header\s*\{[^}]*position:\s*sticky;[^}]*top:\s*0;/s);
+  assert.match(css, /html\s*\{[^}]*scroll-padding-top:/s);
+  assert.match(css, /\.site-header-overlay\s*\{[^}]*margin-bottom:\s*var\(--site-nav-overlap\);/s);
+  assert.doesNotMatch(css, /\.site-header-overlay\s*\{[^}]*position:\s*absolute;/s);
+  assert.doesNotMatch(css, /\.legal-header\s+\.site-header\s*\{[^}]*position:\s*static;/s);
+});
