@@ -28,6 +28,38 @@ const patterns = {
 
 const shorteners = new Set(["bit.ly", "tinyurl.com", "t.co", "goo.gl", "ow.ly", "is.gd", "buff.ly"]);
 
+function normalizeWebAddress(value: string): string {
+  const raw = value.trim();
+  if (!raw) return raw;
+
+  // Keep explicit schemes intact so HTTP and non-web schemes cannot silently
+  // become HTTPS. A domain followed by a numeric port is the one ambiguous
+  // case (for example, example.com:8443), so it is handled as a bare address.
+  if (/^[a-z][a-z\d+.-]*:\/\//i.test(raw)) return raw;
+  if (/^[a-z][a-z\d+.-]*:(?!\d+(?:[/?#]|$))/i.test(raw)) return raw;
+  if (raw.startsWith("//")) return `https:${raw}`;
+
+  // Only add HTTPS when the input parses as a recognizable domain or numeric
+  // host. This avoids turning arbitrary text into something URL-shaped while
+  // still accepting common pasted forms such as www.example.com/path.
+  if (/[\s\\]/.test(raw)) return raw;
+
+  try {
+    const candidate = new URL(`https://${raw}`);
+    const host = candidate.hostname.toLowerCase();
+    const domainLabels = host.split(".");
+    const isDomain = domainLabels.length >= 2 && domainLabels.every((label) =>
+      /^[a-z\d](?:[a-z\d-]{0,61}[a-z\d])?$/i.test(label),
+    );
+    const isIpv4 = /^\d{1,3}(?:\.\d{1,3}){3}$/.test(host);
+    const isIpv6 = host.startsWith("[") && host.endsWith("]") && host.includes(":");
+
+    return isDomain || isIpv4 || isIpv6 ? candidate.toString() : raw;
+  } catch {
+    return raw;
+  }
+}
+
 function signal(code: string, title: string, detail: string): WebCheckSignal {
   return { code, title, detail };
 }
@@ -93,7 +125,7 @@ export function analyzeText(value: string): WebCheckResult {
   if (patterns.impersonation.test(text)) signals.push(signal("impersonation", "Claimed trusted identity", "A familiar organization name can be copied. Verify through contact information you find independently."));
   if (patterns.remoteAccess.test(text)) signals.push(signal("remote_access", "Remote device access", "Unexpected requests to install remote-control software can expose accounts and files."));
 
-  const linkMatch = text.match(/https?:\/\/[^\s<>()]+/i);
+  const linkMatch = text.match(/(?:https?:\/\/|www\.)[^\s<>()]+/i);
   if (linkMatch) {
     const linkResult = analyzeLink(linkMatch[0]);
     for (const item of linkResult.signals) {
@@ -109,9 +141,13 @@ export function analyzeLink(value: string): WebCheckResult {
   const signals: WebCheckSignal[] = [];
   let url: URL;
   try {
-    url = new URL(raw);
+    url = new URL(normalizeWebAddress(raw));
   } catch {
     return resultFor([signal("invalid_link", "Incomplete or invalid link", "A trustworthy destination should be presented as a complete, inspectable web address.")], "this link");
+  }
+
+  if (!["http:", "https:"].includes(url.protocol) || !url.hostname) {
+    return resultFor([signal("invalid_link", "Unsupported link type", "PauseSure checks HTTP and HTTPS website addresses. Other link types need a different verification route.")], "this link");
   }
 
   const host = url.hostname.toLowerCase();

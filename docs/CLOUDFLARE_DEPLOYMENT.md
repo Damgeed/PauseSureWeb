@@ -27,10 +27,12 @@ preserving the path and query string.
 3. Confirm the production branch in GitHub contains `wrangler.jsonc` and that
    its Worker name is `pausesure-web`.
 
-No API token, account ID, D1 UUID, or other credential belongs in GitHub. The
-Cloudflare Git integration creates and stores its deployment token. Wrangler's
-automatic resource provisioning creates the D1 database because the checked-in
-configuration intentionally omits `database_id`.
+No API token or other credential belongs in GitHub. Cloudflare account IDs and
+D1 UUIDs are identifiers rather than secrets, but this repository intentionally
+omits them until a real resource exists. The Cloudflare Git integration creates
+and stores its own deployment token. Wrangler's automatic resource provisioning
+can create the D1 database because the initial configuration omits
+`database_id`.
 
 ## Connect the GitHub repository
 
@@ -57,16 +59,40 @@ The first deployment provisions the D1 binding and attaches both Custom
 Domains. Cloudflare creates the DNS records and TLS certificates for those
 hostnames.
 
-## Apply the D1 schema once
+## Resolve D1 and apply the schema once
 
-After the first deployment has created `pausesure-web-analytics`, apply the
-checked-in migration from a trusted local clone:
+Use the repository-pinned Wrangler version from a trusted local clone. Wrangler
+4.102.0 fixed remote D1 commands for databases created by automatic
+provisioning; this repository pins a newer compatible release.
 
 ```bash
 npm ci
 npx wrangler login
-npm run db:migrate:remote
+npx wrangler d1 list
 ```
+
+If `pausesure-web-analytics` is listed, it already exists. Do not create a
+second database. Apply and verify the migration:
+
+```bash
+npm run db:migrate:remote
+npx wrangler d1 migrations list pausesure-web-analytics --remote
+```
+
+If `pausesure-web-analytics` is not listed, create the real database and let
+Wrangler update the existing `DB` binding before applying the migration:
+
+```bash
+npx wrangler d1 create pausesure-web-analytics --binding DB --update-config
+npm run db:migrate:remote
+npx wrangler d1 migrations list pausesure-web-analytics --remote
+```
+
+After `d1 create`, confirm `wrangler.jsonc` contains exactly one `DB` binding
+with `database_name`, the returned `database_id`, and
+`migrations_dir: "drizzle"`. Do not paste a made-up ID or leave duplicate D1
+entries. If `--update-config` changed the file, commit the real configuration so
+local and GitHub deployments use the same database.
 
 Wrangler records applied migrations in D1, so the command is safe to run again.
 Use the migration command rather than pasting SQL into the dashboard; that
@@ -123,5 +149,7 @@ both the previous and next Worker versions.
 - [Workers Builds configuration](https://developers.cloudflare.com/workers/ci-cd/builds/configuration/)
 - [Worker Custom Domains](https://developers.cloudflare.com/workers/configuration/routing/custom-domains/)
 - [D1 migrations](https://developers.cloudflare.com/d1/reference/migrations/)
+- [D1 Wrangler commands](https://developers.cloudflare.com/d1/wrangler-commands/)
+- [Automatic resource provisioning](https://developers.cloudflare.com/changelog/post/2025-10-24-automatic-resource-provisioning/)
 - [Cloudflare Vite plugin](https://developers.cloudflare.com/workers/vite-plugin/)
 - [vinext](https://github.com/cloudflare/vinext)

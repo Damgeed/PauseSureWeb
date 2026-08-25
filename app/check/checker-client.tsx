@@ -121,7 +121,7 @@ export default function CheckerClient() {
 
   const needsImage = kind === "screenshot" || kind === "qr";
   const placeholder = kind === "link"
-    ? "https://example.com/account/verify"
+    ? "www.example.com or https://example.com/account/verify"
     : kind === "phone"
       ? "+1 202 555 0123"
       : needsImage
