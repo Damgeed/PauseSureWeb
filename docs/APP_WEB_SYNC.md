@@ -35,9 +35,11 @@ For each app pull request, select exactly one:
 
 Before an App Store release:
 
+- Complete the affected rows in [`PUBLIC_CLAIM_MATRIX.md`](PUBLIC_CLAIM_MATRIX.md) using evidence from the private release candidate.
 - Confirm public feature claims match the release candidate.
 - Confirm the privacy policy and App Store privacy answers match actual data flows, including third-party SDKs.
 - Confirm support, security, account deletion, and recovery links work without sign-in.
+- Confirm apex and `www` HTTPS behavior, operational domain email, SPF/DKIM/DMARC, and external mailbox delivery.
 - Confirm app and website use the same current logo, primary action color (`#13aec3`), terminology, and product status.
 - Run website lint, build, rendered-route tests, and broken-link/image checks.
 - Publish the approved website update before or at the same time as the app release.

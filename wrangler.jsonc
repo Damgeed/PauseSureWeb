@@ -1,0 +1,41 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "pausesure-web",
+  "main": "./worker/index.ts",
+  "compatibility_date": "2026-08-25",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": true,
+  "preview_urls": true,
+
+  "assets": {
+    "not_found_handling": "none",
+    "binding": "ASSETS"
+  },
+
+  "images": {
+    "binding": "IMAGES"
+  },
+
+  // Cloudflare can provision this D1 database on the first deployment because
+  // no database_id is committed. Do not replace this with a fake UUID. After
+  // the first deployment, apply the checked-in migrations as documented in
+  // docs/CLOUDFLARE_DEPLOYMENT.md.
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "pausesure-web-analytics",
+      "migrations_dir": "drizzle"
+    }
+  ],
+
+  "routes": [
+    {
+      "pattern": "pausesure.com",
+      "custom_domain": true
+    },
+    {
+      "pattern": "www.pausesure.com",
+      "custom_domain": true
+    }
+  ]
+}

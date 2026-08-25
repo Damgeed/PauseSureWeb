@@ -1,19 +1,19 @@
-import type { Metadata } from "next";
 import Link from "next/link";
-import { Arrow, SiteFooter, SiteHeader, StaticImage } from "../site-shell";
+import { pageMetadata } from "../page-metadata";
+import { Arrow, ReleaseBanner, SiteFooter, SiteHeader, StaticImage } from "../site-shell";
 
-export const metadata: Metadata = {
+export const metadata = pageMetadata({
   title: "Product",
   description: "Explore PauseSure's decision-support tools for suspicious messages, links, QR codes, screenshots, calls, and trusted-family support.",
-  alternates: { canonical: "/product" },
-};
+  path: "/product",
+});
 
 const inputs = [
   ["Message", "Paste a text or email and review pressure, impersonation, payment, and secrecy signals."],
   ["Link", "Inspect the destination and learn how to verify through an official channel you find independently."],
   ["Screenshot", "Extract visible text from a selected screenshot and turn it into a readable review."],
   ["QR code", "Read a code before following it, then separate the destination from the story around it."],
-  ["Call or voicemail", "Review supported audio locally where practical and keep the result in the same calm workflow."],
+  ["Audio or voicemail", "Import a supported audio file or voicemail and review it in the same calm workflow."],
   ["Trusted Circle", "Ask a chosen person for a second opinion without creating a surveillance dashboard."],
 ];
 
@@ -30,7 +30,7 @@ export default function ProductPage() {
           <div className="hero-actions"><Link className="button button-primary" href="/how-it-works">See how it works <Arrow /></Link><Link className="button button-secondary" href="/safety">Safety by design</Link></div>
         </div>
         <div className="decision-console" aria-label="Example PauseSure review">
-          <div className="console-top"><span className="status-dot" /> Live decision support <small>Example</small></div>
+          <div className="console-top"><span className="status-dot" /> PauseSure decision flow <small>Product example</small></div>
           <div className="console-message"><small>Suspicious request</small><strong>“Move your savings now to keep the account safe.”</strong></div>
           <div className="console-signal"><span>01</span><div><strong>High-pressure timing</strong><p>The request tries to remove your time to verify.</p></div></div>
           <div className="console-signal"><span>02</span><div><strong>Unusual money movement</strong><p>A legitimate fraud team should not ask you to move funds to a “safe” account.</p></div></div>
@@ -52,10 +52,11 @@ export default function ProductPage() {
       <section className="section product-family-section">
         <div className="product-family-copy"><p className="section-kicker">Two ways to use PauseSure</p><h2>Protect yourself or support someone you trust.</h2><p>The same product can reinforce personal independence or make a second opinion easier. Permissions remain understandable, selective, and reversible.</p><Link className="text-link" href="/how-it-works">Follow the full protection flow <Arrow /></Link></div>
         <div className="product-family-images">
-          <figure><StaticImage src="/brand/protect-myself.webp" width={900} height={1080} alt="A woman reviewing a message on her phone" /><figcaption><strong>For me</strong><span>Stay in control</span></figcaption></figure>
-          <figure><StaticImage src="/brand/help-someone.webp" width={1200} height={800} alt="A woman helping an older family member review a phone" /><figcaption><strong>For someone I trust</strong><span>Help without taking over</span></figcaption></figure>
+          <figure><StaticImage src="/brand/protect-myself.png" width={900} height={1080} alt="A woman reviewing a message on her phone" /><figcaption><strong>For me</strong><span>Stay in control</span></figcaption></figure>
+          <figure><StaticImage src="/brand/help-someone.png" width={1200} height={800} alt="A woman helping an older family member review a phone" /><figcaption><strong>For someone I trust</strong><span>Help without taking over</span></figcaption></figure>
         </div>
       </section>
+      <ReleaseBanner />
       </main>
       <SiteFooter />
     </>

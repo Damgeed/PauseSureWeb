@@ -1,6 +1,8 @@
 import Link from "next/link";
+import { releaseAction, releaseMessaging } from "./release";
 
 const primaryNavigation = [
+  ["Check now", "/check"],
   ["Product", "/product"],
   ["How it works", "/how-it-works"],
   ["Safety & privacy", "/safety"],
@@ -19,6 +21,23 @@ export function StaticImage({ src, width, height, alt, eager = false }: { src: s
   return <img src={src} width={width} height={height} alt={alt} loading={eager ? "eager" : "lazy"} decoding="async" />;
 }
 
+export function ReleaseLink({ className }: { className: string }) {
+  return <a className={className} href={releaseAction.href}>{releaseAction.label} <Arrow /></a>;
+}
+
+export function ReleaseBanner() {
+  return (
+    <section className="launch-section" id="availability" aria-labelledby="availability-title">
+      <div className="launch-logo"><StaticImage src="/brand/pausesure-logo.png" width={92} height={92} alt="PauseSure logo" /></div>
+      <p className="section-kicker light">{releaseMessaging.eyebrow}</p>
+      <h2 id="availability-title">{releaseMessaging.headline}</h2>
+      <p>{releaseMessaging.summary}</p>
+      <ReleaseLink className="button button-white" />
+      <small>Download PauseSure only from the verified link on pausesure.com. Never share passwords, verification codes, payment details, or sensitive case evidence through an unverified contact route.</small>
+    </section>
+  );
+}
+
 export function SiteHeader({ overlay = false }: { overlay?: boolean }) {
   return (
     <>
@@ -26,18 +45,18 @@ export function SiteHeader({ overlay = false }: { overlay?: boolean }) {
       <header className={`site-header${overlay ? " site-header-overlay" : ""}`}>
         <div className="nav-shell">
           <Link className="wordmark" href="/" aria-label="PauseSure home">
-            <StaticImage src="/brand/pausesure-logo.webp" width={48} height={48} alt="" eager />
+            <StaticImage src="/brand/pausesure-logo.png" width={48} height={48} alt="" eager />
             <span>PauseSure</span>
           </Link>
           <nav className="desktop-nav" aria-label="Primary navigation">
             {primaryNavigation.map(([label, href]) => <Link href={href} key={href}>{label}</Link>)}
           </nav>
-          <Link className="nav-cta desktop-cta" href="/company#contact">Contact <Arrow /></Link>
+          <ReleaseLink className="nav-cta desktop-cta" />
           <details className="mobile-nav">
-            <summary aria-label="Open navigation"><span /><span /><span /></summary>
+            <summary aria-label="Navigation menu"><span /><span /><span /></summary>
             <nav aria-label="Mobile navigation">
               {primaryNavigation.map(([label, href]) => <Link href={href} key={href}>{label}</Link>)}
-              <Link className="mobile-contact" href="/company#contact">Contact PauseSure</Link>
+              <a className="mobile-contact" href={releaseAction.href}>{releaseAction.label}</a>
             </nav>
           </details>
         </div>
@@ -52,17 +71,17 @@ export function SiteFooter() {
       <div className="footer-main">
         <div>
           <Link className="wordmark footer-wordmark" href="/">
-            <StaticImage src="/brand/pausesure-logo.webp" width={48} height={48} alt="" />
+            <StaticImage src="/brand/pausesure-logo.png" width={48} height={48} alt="" />
             <span>PauseSure</span>
           </Link>
           <p>Calm decision support for suspicious requests.</p>
         </div>
-        <div className="footer-column"><strong>Product</strong><Link href="/product">Overview</Link><Link href="/how-it-works">How it works</Link><Link href="/safety">Safety & privacy</Link></div>
+        <div className="footer-column"><strong>Product</strong><Link href="/check">Check now</Link><Link href="/product">Overview</Link><Link href="/how-it-works">How it works</Link><Link href="/safety">Safety & privacy</Link></div>
         <div className="footer-column"><strong>Learn</strong><Link href="/resources">Resources</Link><Link href="/security">Security</Link><Link href="/support">Support</Link></div>
         <div className="footer-column"><strong>Company</strong><Link href="/company">About</Link><Link href="/company#contact">Contact</Link><Link href="/account-deletion">Account deletion</Link></div>
       </div>
       <div className="footer-bottom">
-        <p>© {new Date().getFullYear()} PauseSure. Product in development.</p>
+        <p>© {new Date().getFullYear()} PauseSure. {releaseMessaging.footer}</p>
         <nav aria-label="Legal navigation"><Link href="/privacy">Privacy</Link><Link href="/terms">Terms</Link><Link href="/security">Security</Link></nav>
       </div>
     </footer>

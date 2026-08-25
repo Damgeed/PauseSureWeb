@@ -13,6 +13,7 @@ PauseSure helps people slow down, inspect suspicious requests, verify them indep
 ## Website routes
 
 - `/` — company homepage
+- `/check` — local-first public safety checker
 - `/product` — product overview
 - `/how-it-works` — decision-support workflow
 - `/safety` — safety and privacy design
@@ -40,13 +41,28 @@ npm test
 
 ## Deployment
 
-The production site is published at [pausesure.com](https://pausesure.com). Hosting identity files contain no deployment credential, and production publication remains a deliberate owner-approved action.
+The repository is configured to publish [pausesure.com](https://pausesure.com)
+as a Cloudflare Worker connected directly to GitHub. The checked-in deployment
+contains the Worker, static assets, D1 migration, custom-domain configuration,
+and deploy scripts. It contains no deployment credential or fake resource
+identifier. Until the owner completes the Cloudflare dashboard and DNS cutover,
+the current public host may still be serving the previous deployment.
+
+Follow the owner runbook in
+[`docs/CLOUDFLARE_DEPLOYMENT.md`](docs/CLOUDFLARE_DEPLOYMENT.md) to connect the
+repository, provision D1, attach `pausesure.com`, and verify the canonical `www`
+redirect.
 
 Do not add analytics, advertising pixels, form collection, authentication, or third-party scripts without first updating the privacy review, security review, App Store disclosures where relevant, and public policy pages.
+
+## Release state
+
+`app/release.ts` is the single source of truth for public iPhone availability, download actions, the Company status, homepage FAQ, and footer language. Do not hard-code availability elsewhere. Switch the state to `app-store` only after a verified `https://apps.apple.com/` listing resolves and the release, privacy, security, support, and account-deletion reviews are complete.
 
 ## Operating documents
 
 - [App ↔ web synchronization](docs/APP_WEB_SYNC.md)
+- [Public claim matrix](docs/PUBLIC_CLAIM_MATRIX.md)
 - [Roadmap to one million users](docs/GROWTH_TO_ONE_MILLION.md)
 - [Security reporting](SECURITY.md)
 
@@ -56,4 +72,4 @@ Do not add analytics, advertising pixels, form collection, authentication, or th
 - Primary navy: `#031b49`
 - Use the supplied PauseSure brand artwork. Do not regenerate or stylize the logo without approval.
 
-PauseSure is in active development. Public product claims must describe shipped, verified behavior and must never guarantee that a request is safe.
+Public product claims must describe verified behavior, distinguish examples from live features, and never guarantee that a request is safe.
