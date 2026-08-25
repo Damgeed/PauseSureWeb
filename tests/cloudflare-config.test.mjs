@@ -4,6 +4,9 @@ import test from "node:test";
 
 test("uses a first-party Cloudflare Workers configuration", async () => {
   const source = await readFile(new URL("../wrangler.jsonc", import.meta.url), "utf8");
+  const packageJson = JSON.parse(await readFile(new URL("../package.json", import.meta.url), "utf8"));
+  const wranglerVersion = packageJson.devDependencies.wrangler;
+  const [major, minor] = wranglerVersion.split(".").map(Number);
 
   assert.match(source, /"name"\s*:\s*"pausesure-web"/);
   assert.match(source, /"main"\s*:\s*"\.\/worker\/index\.ts"/);
@@ -11,7 +14,8 @@ test("uses a first-party Cloudflare Workers configuration", async () => {
   assert.match(source, /"database_name"\s*:\s*"pausesure-web-analytics"/);
   assert.match(source, /"pattern"\s*:\s*"pausesure\.com"/);
   assert.match(source, /"pattern"\s*:\s*"www\.pausesure\.com"/);
-  assert.doesNotMatch(source, /database_id\s*"\s*:/, "a fake D1 identifier must not be committed");
+  assert.ok(major > 4 || (major === 4 && minor >= 102), "Wrangler must resolve auto-provisioned D1 bindings for remote migrations");
+  assert.doesNotMatch(source, /(?:database_id|account_id)"?\s*:\s*"(?:0{8}-|<|replace|example|fake)/i, "placeholder Cloudflare identifiers must not be committed");
   assert.doesNotMatch(source, /(?:OpenAI|ChatGPT|site-creator)/i);
 });
 

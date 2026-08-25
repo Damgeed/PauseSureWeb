@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { MobileNavigation } from "./mobile-navigation";
 import { releaseAction, releaseMessaging } from "./release";
 
 const primaryNavigation = [
@@ -52,13 +53,7 @@ export function SiteHeader({ overlay = false }: { overlay?: boolean }) {
             {primaryNavigation.map(([label, href]) => <Link href={href} key={href}>{label}</Link>)}
           </nav>
           <ReleaseLink className="nav-cta desktop-cta" />
-          <details className="mobile-nav">
-            <summary aria-label="Navigation menu"><span /><span /><span /></summary>
-            <nav aria-label="Mobile navigation">
-              {primaryNavigation.map(([label, href]) => <Link href={href} key={href}>{label}</Link>)}
-              <a className="mobile-contact" href={releaseAction.href}>{releaseAction.label}</a>
-            </nav>
-          </details>
+          <MobileNavigation navigation={primaryNavigation} releaseAction={releaseAction} />
         </div>
       </header>
     </>

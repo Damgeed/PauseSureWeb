@@ -112,3 +112,14 @@ test("keeps navigation visible without hiding anchored content", async () => {
   assert.doesNotMatch(css, /\.site-header-overlay\s*\{[^}]*position:\s*absolute;/s);
   assert.doesNotMatch(css, /\.legal-header\s+\.site-header\s*\{[^}]*position:\s*static;/s);
 });
+
+test("dismisses the mobile navigation without weakening keyboard access", async () => {
+  const source = await readFile(new URL("../app/mobile-navigation.tsx", import.meta.url), "utf8");
+  assert.match(source, /document\.addEventListener\("pointerdown",\s*handlePointerDown\)/);
+  assert.match(source, /!event\.composedPath\(\)\.includes\(details\)/);
+  assert.match(source, /event\.key\s*===\s*"Escape"/);
+  assert.match(source, /closeMenu\(true\)/, "Escape should close the menu and restore summary focus");
+  assert.match(source, /aria-expanded=\{isOpen\}/);
+  assert.match(source, /onClick=\{\(\)\s*=>\s*closeMenu\(\)\}/, "menu links should close the menu after activation");
+  assert.match(source, /removeEventListener\("pointerdown",\s*handlePointerDown\)/, "outside-click listeners should be cleaned up");
+});
