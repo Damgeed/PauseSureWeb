@@ -38,4 +38,5 @@ test("redirects www to the canonical apex without dropping path or query", async
   assert.equal(response.status, 308);
   assert.equal(response.headers.get("location"), "https://pausesure.com/resources?from=www");
   assert.equal(response.headers.get("x-content-type-options"), "nosniff");
+  assert.match(response.headers.get("content-security-policy") ?? "", /frame-ancestors 'none'/);
 });

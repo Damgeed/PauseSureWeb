@@ -20,6 +20,12 @@ test("renders the public multi-page company site", async () => {
     assert.equal(response.headers.get("x-frame-options"), "DENY");
     assert.equal(response.headers.get("referrer-policy"), "strict-origin-when-cross-origin");
     assert.match(response.headers.get("permissions-policy") ?? "", /camera=\(\)/);
+    const csp = response.headers.get("content-security-policy") ?? "";
+    assert.match(csp, /default-src 'self'/);
+    assert.match(csp, /connect-src 'self'/);
+    assert.match(csp, /frame-ancestors 'none'/);
+    assert.match(csp, /object-src 'none'/);
+    assert.doesNotMatch(csp, /https?:|\*/i, "CSP should not allow third-party or wildcard resource origins");
     const html = await response.text();
     assert.match(html, /PauseSure/i);
     assert.doesNotMatch(html, /codex-preview/i);

@@ -20,7 +20,25 @@ interface ExecutionContext {
   passThroughOnException(): void;
 }
 
+const contentSecurityPolicy = [
+  "default-src 'self'",
+  "base-uri 'self'",
+  "connect-src 'self'",
+  "font-src 'self'",
+  "form-action 'self'",
+  "frame-ancestors 'none'",
+  "img-src 'self' data:",
+  "media-src 'self'",
+  "object-src 'none'",
+  // Vinext/React currently emits inline bootstrap and style elements. Keep
+  // those working while restricting every executable/resource origin to self.
+  "script-src 'self' 'unsafe-inline'",
+  "style-src 'self' 'unsafe-inline'",
+  "upgrade-insecure-requests",
+].join("; ");
+
 const securityHeaders = {
+  "Content-Security-Policy": contentSecurityPolicy,
   "Cross-Origin-Opener-Policy": "same-origin",
   "Permissions-Policy": "camera=(), geolocation=(), microphone=(), payment=(), usb=()",
   "Referrer-Policy": "strict-origin-when-cross-origin",
