@@ -25,6 +25,12 @@ test("renders the public multi-page company site", async () => {
     assert.match(csp, /connect-src 'self'/);
     assert.match(csp, /frame-ancestors 'none'/);
     assert.match(csp, /object-src 'none'/);
+    assert.match(csp, /base-uri 'none'/);
+    assert.match(csp, /img-src 'self' data: blob:/);
+    assert.match(csp, /script-src-attr 'none'/);
+    assert.match(csp, /style-src 'self'(?:;|$)/);
+    assert.match(csp, /style-src-attr 'none'/);
+    assert.doesNotMatch(csp, /style-src[^;]*'unsafe-inline'/);
     assert.doesNotMatch(csp, /https?:|\*/i, "CSP should not allow third-party or wildcard resource origins");
     const html = await response.text();
     assert.match(html, /PauseSure/i);
@@ -57,39 +63,189 @@ test("accepts only same-origin, allowlisted, content-free analytics", async () =
   workerUrl.searchParams.set("analytics-test", `${process.pid}-${Date.now()}`);
   const { default: worker } = await import(workerUrl.href);
   const batches = [];
+  const runs = [];
+  const rateLimitKeys = [];
   const DB = {
     prepare(sql) {
-      return { bind(...values) { return { sql, values }; } };
+      return {
+        sql,
+        values: [],
+        bind(...values) { this.values = values; return this; },
+        async run() { runs.push(this); return { success: true }; },
+      };
     },
     async batch(statements) { batches.push(statements); return statements.map(() => ({ success: true })); },
   };
-  const env = { ASSETS: { fetch: async () => new Response("Not found", { status: 404 }) }, DB };
+  const ANALYTICS_RATE_LIMITER = {
+    async limit({ key }) { rateLimitKeys.push(key); return { success: true }; },
+  };
+  const env = { ASSETS: { fetch: async () => new Response("Not found", { status: 404 }) }, DB, ANALYTICS_RATE_LIMITER };
   const ctx = { waitUntil() {}, passThroughOnException() {} };
   const day = new Date().toISOString().slice(0, 10);
   const validBody = { events: [{ schemaVersion: 1, name: "web_check_completed", day, count: 1, dimensions: { input: "link", risk: "high", channel: "web" } }] };
-  const valid = await worker.fetch(new Request("http://localhost/api/privacy-events", {
+  const analyticsHeaders = {
+    origin: "https://pausesure.com",
+    "content-type": "application/json",
+    "cf-connecting-ip": "192.0.2.10",
+  };
+  const valid = await worker.fetch(new Request("https://pausesure.com/api/privacy-events", {
     method: "POST",
-    headers: { origin: "http://localhost", "content-type": "application/json" },
+    headers: analyticsHeaders,
     body: JSON.stringify(validBody),
   }), env, ctx);
   assert.equal(valid.status, 204);
   assert.equal(batches.length, 1);
-  assert.equal(batches[0].length, 2, "retention cleanup and aggregate upsert should run");
-  assert.ok(batches[0][1].values.every((value) => !String(value).includes("http")), "aggregate values should contain no checked URL");
+  assert.equal(batches[0].length, 1, "only aggregate upserts should run in the request path");
+  assert.ok(batches[0][0].values.every((value) => !String(value).includes("http")), "aggregate values should contain no checked URL");
+  assert.ok(batches[0][0].values.every((value) => value !== "192.0.2.10"), "the edge rate-limit key must never enter D1");
+  assert.deepEqual(rateLimitKeys, ["privacy-events:192.0.2.10"]);
 
-  const identifying = await worker.fetch(new Request("http://localhost/api/privacy-events", {
+  const identifying = await worker.fetch(new Request("https://pausesure.com/api/privacy-events", {
     method: "POST",
-    headers: { origin: "http://localhost", "content-type": "application/json" },
+    headers: analyticsHeaders,
     body: JSON.stringify({ events: [{ ...validBody.events[0], rawContent: "secret message" }] }),
   }), env, ctx);
   assert.equal(identifying.status, 400);
 
-  const crossOrigin = await worker.fetch(new Request("http://localhost/api/privacy-events", {
+  const impossibleDimensions = await worker.fetch(new Request("https://pausesure.com/api/privacy-events", {
+    method: "POST",
+    headers: analyticsHeaders,
+    body: JSON.stringify({ events: [{ schemaVersion: 1, name: "web_check_started", day, count: 1, dimensions: { risk: "high", action: "mark_safe", channel: "web" } }] }),
+  }), env, ctx);
+  assert.equal(impossibleDimensions.status, 400);
+
+  const amplifiedCount = await worker.fetch(new Request("https://pausesure.com/api/privacy-events", {
+    method: "POST",
+    headers: analyticsHeaders,
+    body: JSON.stringify({ events: [{ ...validBody.events[0], count: 5 }] }),
+  }), env, ctx);
+  assert.equal(amplifiedCount.status, 400);
+
+  const inheritedEventName = await worker.fetch(new Request("https://pausesure.com/api/privacy-events", {
+    method: "POST",
+    headers: analyticsHeaders,
+    body: JSON.stringify({ events: [{ schemaVersion: 1, name: "constructor", day, count: 1, dimensions: {} }] }),
+  }), env, ctx);
+  assert.equal(inheritedEventName.status, 400, "prototype properties must not bypass the exact event allowlist");
+
+  const crossOrigin = await worker.fetch(new Request("https://pausesure.com/api/privacy-events", {
     method: "POST",
     headers: { origin: "https://attacker.example", "content-type": "application/json" },
     body: JSON.stringify(validBody),
   }), env, ctx);
   assert.equal(crossOrigin.status, 403);
+
+  const wrongMediaType = await worker.fetch(new Request("https://pausesure.com/api/privacy-events", {
+    method: "POST",
+    headers: { ...analyticsHeaders, "content-type": "application/json-p" },
+    body: JSON.stringify(validBody),
+  }), env, ctx);
+  assert.equal(wrongMediaType.status, 415);
+
+  let pulledBytes = 0;
+  let streamCancelled = false;
+  const oversizedBody = new ReadableStream({
+    pull(controller) {
+      pulledBytes += 1_024;
+      controller.enqueue(new Uint8Array(1_024));
+    },
+    cancel() { streamCancelled = true; },
+  }, { highWaterMark: 0 });
+  const oversized = await worker.fetch(new Request("https://pausesure.com/api/privacy-events", {
+    method: "POST",
+    headers: analyticsHeaders,
+    body: oversizedBody,
+    duplex: "half",
+  }), env, ctx);
+  assert.equal(oversized.status, 413);
+  assert.ok(streamCancelled, "oversized chunked bodies should be cancelled immediately");
+  assert.ok(pulledBytes <= 5_120, `the worker should stop near the 4096-byte limit, read ${pulledBytes} bytes`);
+  assert.equal(batches.length, 1, "rejected requests must not touch D1");
+
+  const rateLimitedEnv = {
+    ...env,
+    ANALYTICS_RATE_LIMITER: { async limit() { return { success: false }; } },
+  };
+  const rateLimited = await worker.fetch(new Request("https://pausesure.com/api/privacy-events", {
+    method: "POST",
+    headers: analyticsHeaders,
+    body: JSON.stringify(validBody),
+  }), rateLimitedEnv, ctx);
+  assert.equal(rateLimited.status, 429);
+  assert.equal(rateLimited.headers.get("retry-after"), "60");
+  assert.equal(batches.length, 1, "rate-limited requests must not touch D1");
+
+  const unavailableLimiter = await worker.fetch(new Request("https://pausesure.com/api/privacy-events", {
+    method: "POST",
+    headers: analyticsHeaders,
+    body: JSON.stringify(validBody),
+  }), { ...env, ANALYTICS_RATE_LIMITER: undefined }, ctx);
+  assert.equal(unavailableLimiter.status, 503, "analytics must fail closed when edge abuse protection is unavailable");
+  assert.equal(batches.length, 1, "unprotected requests must not touch D1");
+
+  const failedLimiter = await worker.fetch(new Request("https://pausesure.com/api/privacy-events", {
+    method: "POST",
+    headers: analyticsHeaders,
+    body: JSON.stringify(validBody),
+  }), { ...env, ANALYTICS_RATE_LIMITER: { async limit() { throw new Error("edge unavailable"); } } }, ctx);
+  assert.equal(failedLimiter.status, 503, "analytics must fail closed when the edge limiter errors");
+  assert.equal(batches.length, 1, "limiter failures must not touch D1");
+
+  assert.equal(runs.length, 0, "retention cleanup must not run in a user request");
+});
+
+test("runs aggregate retention cleanup from the daily scheduled handler", async () => {
+  const workerUrl = new URL("../dist/server/index.js", import.meta.url);
+  workerUrl.searchParams.set("retention-test", `${process.pid}-${Date.now()}`);
+  const { default: worker } = await import(workerUrl.href);
+  const runs = [];
+  const DB = {
+    prepare(sql) {
+      return {
+        sql,
+        values: [],
+        bind(...values) { this.values = values; return this; },
+        async run() { runs.push(this); return { success: true }; },
+      };
+    },
+    async batch() { throw new Error("scheduled retention should not batch analytics events"); },
+  };
+  const scheduledWork = [];
+  worker.scheduled({}, { ASSETS: { fetch: async () => new Response("Not found", { status: 404 }) }, DB }, {
+    waitUntil(promise) { scheduledWork.push(promise); },
+    passThroughOnException() {},
+  });
+  await Promise.all(scheduledWork);
+
+  assert.equal(runs.length, 1);
+  assert.match(runs[0].sql, /^DELETE FROM privacy_event_daily WHERE day < \?$/);
+  assert.match(runs[0].values[0], /^\d{4}-\d{2}-\d{2}$/);
+
+  const logged = [];
+  const originalConsoleError = console.error;
+  console.error = (...values) => logged.push(values);
+  try {
+    const failedWork = [];
+    worker.scheduled({}, {
+      ASSETS: { fetch: async () => new Response("Not found", { status: 404 }) },
+      DB: {
+        prepare() {
+          return {
+            bind() { return this; },
+            async run() { throw new Error("private row value"); },
+          };
+        },
+        async batch() { throw new Error("not used"); },
+      },
+    }, {
+      waitUntil(promise) { failedWork.push(promise); },
+      passThroughOnException() {},
+    });
+    await assert.rejects(Promise.all(failedWork), /Scheduled analytics retention cleanup failed/);
+  } finally {
+    console.error = originalConsoleError;
+  }
+  assert.deepEqual(logged, [["[PauseSure] Scheduled analytics retention cleanup failed."]]);
 });
 
 test("ships optimized brand imagery and product film", async () => {

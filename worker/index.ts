@@ -1,39 +1,29 @@
-/** Cloudflare Worker entry point for the vinext-starter template. */
-import { handleImageOptimization, DEFAULT_DEVICE_SIZES, DEFAULT_IMAGE_SIZES } from "vinext/server/image-optimization";
+/** Cloudflare Worker entry point for PauseSure. */
 import handler from "vinext/server/app-router-entry";
-import { handlePrivacyEvents } from "./privacy-events";
+import { deleteExpiredPrivacyEvents, handlePrivacyEvents, type PrivacyEventEnv } from "./privacy-events";
 
-interface Env {
+const canonicalOrigin = "https://pausesure.com";
+
+interface Env extends PrivacyEventEnv {
   ASSETS: Fetcher;
-  DB?: D1Database;
-  IMAGES: {
-    input(stream: ReadableStream): {
-      transform(options: Record<string, unknown>): {
-        output(options: { format: string; quality: number }): Promise<{ response(): Response }>;
-      };
-    };
-  };
-}
-
-interface ExecutionContext {
-  waitUntil(promise: Promise<unknown>): void;
-  passThroughOnException(): void;
 }
 
 const contentSecurityPolicy = [
   "default-src 'self'",
-  "base-uri 'self'",
+  "base-uri 'none'",
   "connect-src 'self'",
   "font-src 'self'",
   "form-action 'self'",
   "frame-ancestors 'none'",
-  "img-src 'self' data:",
+  "img-src 'self' data: blob:",
   "media-src 'self'",
   "object-src 'none'",
-  // Vinext/React currently emits inline bootstrap and style elements. Keep
-  // those working while restricting every executable/resource origin to self.
+  // Vinext/React currently emits inline bootstrap script elements. Inline
+  // attributes and styles remain prohibited.
   "script-src 'self' 'unsafe-inline'",
-  "style-src 'self' 'unsafe-inline'",
+  "script-src-attr 'none'",
+  "style-src 'self'",
+  "style-src-attr 'none'",
   "upgrade-insecure-requests",
 ].join("; ");
 
@@ -59,19 +49,30 @@ function withSecurityHeaders(response: Response): Response {
   });
 }
 
-// Image security config. SVG sources with .svg extension auto-skip the
-// optimization endpoint on the client side (served directly, no proxy).
-// To route SVGs through the optimizer (with security headers), set
-// dangerouslyAllowSVG: true in next.config.js and uncomment below:
-// const imageConfig: ImageConfig = { dangerouslyAllowSVG: true };
+function isLocalDevelopmentHost(hostname: string) {
+  // Production is canonical-only. Local HTTP remains available solely for the
+  // Vite/Workers development runtime and is never a configured public route.
+  return hostname === "localhost" || hostname === "127.0.0.1" || hostname === "[::1]";
+}
+
+function canonicalRedirect(url: URL) {
+  const destination = new URL(canonicalOrigin);
+  destination.pathname = url.pathname;
+  destination.search = url.search;
+  return Response.redirect(destination.toString(), 308);
+}
 
 const worker = {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
+    const hostname = url.hostname.toLowerCase();
+    const isLocalDevelopment = isLocalDevelopmentHost(hostname);
 
-    if (url.hostname.toLowerCase() === "www.pausesure.com") {
-      url.hostname = "pausesure.com";
-      return withSecurityHeaders(Response.redirect(url.toString(), 308));
+    if (!isLocalDevelopment && (url.protocol !== "https:" || hostname === "www.pausesure.com")) {
+      return withSecurityHeaders(canonicalRedirect(url));
+    }
+    if (!isLocalDevelopment && hostname !== "pausesure.com") {
+      return withSecurityHeaders(new Response("Misdirected Request", { status: 421 }));
     }
 
     if (url.pathname === "/api/privacy-events") {
@@ -79,18 +80,19 @@ const worker = {
     }
 
     if (url.pathname === "/_vinext/image") {
-      const allowedWidths = [...DEFAULT_DEVICE_SIZES, ...DEFAULT_IMAGE_SIZES];
-      const response = await handleImageOptimization(request, {
-        fetchAsset: (path) => env.ASSETS.fetch(new Request(new URL(path, request.url))),
-        transformImage: async (body, { width, format, quality }) => {
-          const result = await env.IMAGES.input(body).transform(width > 0 ? { width } : {}).output({ format, quality });
-          return result.response();
-        },
-      }, allowedWidths);
-      return withSecurityHeaders(response);
+      return withSecurityHeaders(new Response("Not Found", { status: 404 }));
     }
 
     return withSecurityHeaders(await handler.fetch(request, env, ctx));
+  },
+
+  scheduled(_controller: ScheduledController, env: Env, ctx: ExecutionContext) {
+    ctx.waitUntil(deleteExpiredPrivacyEvents(env).catch(() => {
+      // Keep scheduled failures visible without writing SQL, row values, IPs,
+      // or any analytics dimensions to logs.
+      console.error("[PauseSure] Scheduled analytics retention cleanup failed.");
+      throw new Error("Scheduled analytics retention cleanup failed.");
+    }));
   },
 };
 

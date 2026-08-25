@@ -24,7 +24,5 @@ jobs:
         with:
           node-version: 22.13.0
       - run: npm ci
-      - run: npm run audit:prod
-      - run: npm run audit:full
-      - run: npm run lint
-      - run: npm test
+      - run: npm run audit:signatures
+      - run: npm run verify

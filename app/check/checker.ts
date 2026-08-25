@@ -27,6 +27,7 @@ const patterns = {
 };
 
 const shorteners = new Set(["bit.ly", "tinyurl.com", "t.co", "goo.gl", "ow.ly", "is.gd", "buff.ly"]);
+const maximumLinksPerMessage = 8;
 
 function normalizeWebAddress(value: string): string {
   const raw = value.trim();
@@ -125,8 +126,15 @@ export function analyzeText(value: string): WebCheckResult {
   if (patterns.impersonation.test(text)) signals.push(signal("impersonation", "Claimed trusted identity", "A familiar organization name can be copied. Verify through contact information you find independently."));
   if (patterns.remoteAccess.test(text)) signals.push(signal("remote_access", "Remote device access", "Unexpected requests to install remote-control software can expose accounts and files."));
 
-  const linkMatch = text.match(/(?:https?:\/\/|www\.)[^\s<>()]+/i);
-  if (linkMatch) {
+  let inspectedLinks = 0;
+  for (const linkMatch of text.matchAll(/(?:https?:\/\/|www\.)[^\s<>()]+/gi)) {
+    if (inspectedLinks >= maximumLinksPerMessage) {
+      if (!signals.some((existing) => existing.code === "many_links")) {
+        signals.push(signal("many_links", "Many destinations", "The message contains more links than this first check inspects individually. Verify every destination independently."));
+      }
+      break;
+    }
+    inspectedLinks += 1;
     const linkResult = analyzeLink(linkMatch[0]);
     for (const item of linkResult.signals) {
       if (item.code !== "limited_evidence" && !signals.some((existing) => existing.code === item.code)) signals.push(item);
@@ -157,7 +165,8 @@ export function analyzeLink(value: string): WebCheckResult {
   if (host.includes("xn--")) signals.push(signal("encoded_host", "Encoded domain name", "Internationalized domain encoding can be legitimate, but it can also imitate familiar letters."));
   if (url.port && !["80", "443"].includes(url.port)) signals.push(signal("unusual_port", "Unusual network port", "The address uses a nonstandard port that deserves additional verification."));
   if (host.split(".").length > 4) signals.push(signal("deep_subdomain", "Long destination name", "Important organization names placed early in a long address may not control the actual domain."));
-  if (shorteners.has(host)) signals.push(signal("short_link", "Destination is hidden", "A shortened address prevents you from seeing the final website before opening it."));
+  const comparableHost = host.startsWith("www.") ? host.slice(4) : host;
+  if (shorteners.has(comparableHost)) signals.push(signal("short_link", "Destination is hidden", "A shortened address prevents you from seeing the final website before opening it."));
   if (/\b(login|verify|secure|wallet|payment|invoice|account)\b/i.test(url.pathname.replace(/[-_]/g, " "))) signals.push(signal("sensitive_path", "Sensitive-action wording", "The address asks for a login, verification, account, or payment action. Confirm the real domain first."));
 
   return resultFor(signals, "this web address");
@@ -181,6 +190,7 @@ export function analyzePhone(value: string): WebCheckResult {
 
 export function analyzeCheck(kind: WebCheckKind, value: string): WebCheckResult {
   if (kind === "link") return analyzeLink(value);
+  if (kind === "qr") return analyzeLink(value);
   if (kind === "phone") return analyzePhone(value);
   return analyzeText(value);
 }
