@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
+const reputationOrigin = "https://pausesure-production.up.railway.app";
+
 test("renders the public multi-page company site", async () => {
   const workerUrl = new URL("../dist/server/index.js", import.meta.url);
   workerUrl.searchParams.set("test", `${process.pid}-${Date.now()}`);
@@ -22,7 +24,7 @@ test("renders the public multi-page company site", async () => {
     assert.match(response.headers.get("permissions-policy") ?? "", /camera=\(\)/);
     const csp = response.headers.get("content-security-policy") ?? "";
     assert.match(csp, /default-src 'self'/);
-    assert.match(csp, /connect-src 'self'/);
+    assert.match(csp, /connect-src 'self' https:\/\/pausesure-production\.up\.railway\.app(?:;|$)/);
     assert.match(csp, /frame-ancestors 'none'/);
     assert.match(csp, /object-src 'none'/);
     assert.match(csp, /base-uri 'none'/);
@@ -31,7 +33,8 @@ test("renders the public multi-page company site", async () => {
     assert.match(csp, /style-src 'self'(?:;|$)/);
     assert.match(csp, /style-src-attr 'none'/);
     assert.doesNotMatch(csp, /style-src[^;]*'unsafe-inline'/);
-    assert.doesNotMatch(csp, /https?:|\*/i, "CSP should not allow third-party or wildcard resource origins");
+    assert.deepEqual(csp.match(/https?:\/\/[^\s;]+/g) ?? [], [reputationOrigin]);
+    assert.doesNotMatch(csp, /\*/u, "CSP should not allow wildcard resource origins");
     const html = await response.text();
     assert.match(html, /PauseSure/i);
     assert.doesNotMatch(html, /codex-preview/i);
@@ -60,11 +63,27 @@ test("renders the public multi-page company site", async () => {
       assert.match(html, /Protection tools/i);
       assert.match(html, /does not record cellular calls or analyze live call audio/i);
     }
+
+    if (route === "/check") {
+      assert.match(html, /role="tablist"/i);
+      assert.match(html, /role="tab"[^>]*aria-controls="checker-input-panel"/i);
+      assert.match(html, /role="tabpanel"[^>]*aria-labelledby="checker-tab-text"/i);
+      assert.match(html, /class="checker-result-live"[^>]*aria-live="polite"/i);
+    }
   }
 
   const missing = await worker.fetch(new Request("http://localhost/not-a-pause-sure-page", { headers: { accept: "text/html" } }), env, ctx);
   assert.equal(missing.status, 404, "unknown routes should return a real 404");
   assert.match(await missing.text(), /This link does not lead to a PauseSure page/i);
+});
+
+test("permits browser reputation requests only to the production gateway", async () => {
+  const headers = await readFile(new URL("../public/_headers", import.meta.url), "utf8");
+  const cspLine = headers.split("\n").find((line) => line.includes("Content-Security-Policy:")) ?? "";
+
+  assert.match(cspLine, /connect-src 'self' https:\/\/pausesure-production\.up\.railway\.app(?:;|$)/);
+  assert.deepEqual(cspLine.match(/https?:\/\/[^\s;]+/g) ?? [], [reputationOrigin]);
+  assert.doesNotMatch(cspLine, /\*/u);
 });
 
 test("publishes a schema-valid Scam Pulse feed backed by official sources", async () => {
