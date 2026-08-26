@@ -9,12 +9,12 @@ export const metadata = pageMetadata({
 });
 
 const inputs = [
-  ["Message", "Paste a text or email and review pressure, impersonation, payment, and secrecy signals."],
-  ["Link", "Inspect the address structure and learn how to verify through an official channel you find independently. PauseSure does not silently open the destination."],
-  ["Screenshot", "Extract visible text from a selected screenshot and turn it into a readable review."],
+  ["Message", "Paste a text or email, review pressure, impersonation, payment, and secrecy signals, and check each bounded web address without sending the surrounding message."],
+  ["Link", "Inspect the address structure, check the minimized address against Google Web Risk, and verify high-impact requests through an official channel you find independently."],
+  ["Screenshot", "Select a screenshot for private preview, then paste the visible wording into the same explainable review."],
   ["QR code", "Read a code before following it, then separate the destination from the story around it."],
   ["Audio or voicemail", "Import a supported file you select and review its transcript in the same calm workflow. PauseSure does not record live cellular calls."],
-  ["Protection setup", "Review the iPhone settings and local readiness states PauseSure can inspect, with manual checks clearly identified."],
+  ["Protection setup", "Review the iPhone settings and readiness states PauseSure can inspect, with manual checks clearly identified."],
   ["Trusted Circle", "Ask a chosen person for a second opinion without creating a surveillance dashboard."],
 ];
 
