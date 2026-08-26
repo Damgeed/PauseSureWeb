@@ -195,6 +195,25 @@ function resultFor(signals: WebCheckSignal[], context: string): WebCheckResult {
   };
 }
 
+function unverifiedMessageResult(): WebCheckResult {
+  return {
+    risk: "unclear",
+    label: "Couldn’t verify",
+    summary: "No strong phrase match was found, but PauseSure has not verified the sender, language coverage, or surrounding context.",
+    signals: [signal(
+      "message_context_unverified",
+      "Message context not verified",
+      "Phrase rules can miss unfamiliar wording, other languages, spoofed identities, and facts outside the submitted text.",
+    )],
+    nextSteps: [
+      "Verify unexpected requests through an official channel you find yourself.",
+      "Never share a password, security code, or payment because someone is rushing you.",
+      "Ask a trusted person to review the full situation before an irreversible action.",
+    ],
+    limitation: "Couldn’t verify is not a safety result. Phrase rules are not a calibrated multilingual accuracy benchmark.",
+  };
+}
+
 export function normalizeLinkForReputation(value: string): string | null {
   try {
     const url = new URL(normalizeWebAddress(value));
@@ -248,7 +267,7 @@ export function reputationIndicatorsForCheck(
 
 export function analyzeText(value: string): WebCheckResult {
   const text = value.trim();
-  if (!text) return resultFor([], "the text provided");
+  if (!text) return unverifiedMessageResult();
 
   const signals: WebCheckSignal[] = [];
   if (patterns.urgency.test(text)) signals.push(signal("urgency", "Pressure or urgency", "The wording pushes for action before there is time to verify."));
@@ -279,7 +298,9 @@ export function analyzeText(value: string): WebCheckResult {
     }
   }
 
-  return resultFor(signals, "this message");
+  return signals.length === 0
+    ? unverifiedMessageResult()
+    : resultFor(signals, "this message");
 }
 
 export function analyzeLink(value: string): WebCheckResult {
