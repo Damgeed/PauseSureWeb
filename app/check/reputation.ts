@@ -217,10 +217,17 @@ export function combineReputationDecision(
   }
 
   if (rulesResult.risk !== "insufficient") return rulesResult;
-  const hasUnverifiedAddress = evidence.some((item) => (
-    item.kind === "transport_failure" || item.response.resultType === "couldnt_verify"
+  const allAddressesHaveNoKnownMatch = evidence.length > 0 && evidence.every((item) => (
+    item.kind === "provider_response" && item.response.resultType === "no_known_match"
   ));
-  if (!hasUnverifiedAddress) return rulesResult;
+  if (allAddressesHaveNoKnownMatch) {
+    return {
+      ...rulesResult,
+      label: "Likely safe",
+      summary: "No strong structural warning signals were found, and Google Web Risk returned no known threat match for every checked address.",
+      limitation: "Likely safe is not a guarantee. Google Web Risk results can include false positives and false negatives.",
+    };
+  }
 
   return {
     ...rulesResult,

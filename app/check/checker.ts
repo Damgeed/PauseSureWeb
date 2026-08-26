@@ -29,8 +29,27 @@ const patterns = {
 };
 
 const shorteners = new Set(["bit.ly", "tinyurl.com", "t.co", "goo.gl", "ow.ly", "is.gd", "buff.ly"]);
+const redirectParameterNames = new Set([
+  "continue",
+  "dest",
+  "destination",
+  "link",
+  "next",
+  "redirect",
+  "redirect_to",
+  "redirect_uri",
+  "redirect_url",
+  "return",
+  "return_to",
+  "return_url",
+  "target",
+  "u",
+  "url",
+  "uri",
+]);
 const maximumLinksPerMessage = 8;
 const maximumLinkCharacters = 2_048;
+const maximumRedirectDepth = 2;
 const boundedTextTokenPattern = new RegExp(
   `(?:^|\\s)(\\S{1,${maximumLinkCharacters}})(?=\\s|$)`,
   "gu",
@@ -183,15 +202,34 @@ function resultFor(signals: WebCheckSignal[], context: string): WebCheckResult {
 
   return {
     risk,
-    label: "Likely safe",
-    summary: `No strong scam signals were found in ${context}.`,
+    label: "Couldn’t verify",
+    summary: `No strong structural warning signals were found in ${context}, but a current live reputation result is required before PauseSure can use Likely safe.`,
     signals: [signal("limited_evidence", "Limited visible evidence", "Many scams look ordinary at first or depend on context outside this check.")],
     nextSteps: [
       "Verify unexpected requests through an official channel you find yourself.",
       "Never share a password, security code, or payment because someone is rushing you.",
       "Check again if the conversation changes or a payment request appears.",
     ],
-    limitation: "Likely safe is not a guarantee.",
+    limitation: "Couldn’t verify is not a safety result.",
+  };
+}
+
+function unverifiedMessageResult(): WebCheckResult {
+  return {
+    risk: "unclear",
+    label: "Couldn’t verify",
+    summary: "No strong phrase match was found, but PauseSure has not verified the sender, language coverage, or surrounding context.",
+    signals: [signal(
+      "message_context_unverified",
+      "Message context not verified",
+      "Phrase rules can miss unfamiliar wording, other languages, spoofed identities, and facts outside the submitted text.",
+    )],
+    nextSteps: [
+      "Verify unexpected requests through an official channel you find yourself.",
+      "Never share a password, security code, or payment because someone is rushing you.",
+      "Ask a trusted person to review the full situation before an irreversible action.",
+    ],
+    limitation: "Couldn’t verify is not a safety result. Phrase rules are not a calibrated multilingual accuracy benchmark.",
   };
 }
 
@@ -214,19 +252,62 @@ export function normalizeLinkForReputation(value: string): string | null {
   }
 }
 
+function reputationIndicatorsForAddress(value: string): string[] {
+  const indicators: string[] = [];
+  const seenIndicators = new Set<string>();
+  const visitedAddresses = new Set<string>();
+
+  function visit(candidate: string, depth: number, base?: URL) {
+    let url: URL;
+    try {
+      url = new URL(normalizeWebAddress(candidate), base);
+    } catch {
+      return;
+    }
+    if (!["http:", "https:"].includes(url.protocol) || !url.hostname) return;
+
+    const visitKey = url.toString();
+    if (visitedAddresses.has(visitKey)) return;
+    visitedAddresses.add(visitKey);
+
+    const indicator = normalizeLinkForReputation(url.toString());
+    if (indicator && !seenIndicators.has(indicator)) {
+      seenIndicators.add(indicator);
+      indicators.push(indicator);
+    }
+    if (depth >= maximumRedirectDepth) return;
+
+    for (const [name, destination] of url.searchParams) {
+      if (!redirectParameterNames.has(name.toLowerCase()) || !destination.trim()) continue;
+      visit(destination.trim(), depth + 1, url);
+    }
+  }
+
+  visit(value, 0);
+  return indicators;
+}
+
+function inspectionKeyForLink(value: string): string {
+  try {
+    const url = new URL(normalizeWebAddress(value));
+    url.hash = "";
+    return url.toString();
+  } catch {
+    return value.toLowerCase();
+  }
+}
+
 export function reputationIndicatorsForCheck(
   kind: WebCheckKind,
   value: string,
 ): string[] {
   if (kind === "link" || kind === "qr") {
-    const indicator = normalizeLinkForReputation(value);
-    return indicator ? [indicator] : [];
+    return reputationIndicatorsForAddress(value).slice(0, maximumLinksPerMessage);
   }
   if (kind !== "text") return [];
 
   const indicators: string[] = [];
   const seen = new Set<string>();
-  let inspectedLinks = 0;
   for (const tokenMatch of value.matchAll(boundedTextTokenPattern)) {
     const linkValue = trimLinkToken(tokenMatch[1]);
     if (
@@ -234,11 +315,9 @@ export function reputationIndicatorsForCheck(
       || linkValue.length > maximumLinkCharacters
       || !shouldInspectTextLink(linkValue)
     ) continue;
-    if (inspectedLinks >= maximumLinksPerMessage) break;
-    inspectedLinks += 1;
-
-    const indicator = normalizeLinkForReputation(linkValue);
-    if (indicator && !seen.has(indicator)) {
+    for (const indicator of reputationIndicatorsForAddress(linkValue)) {
+      if (seen.has(indicator)) continue;
+      if (indicators.length >= maximumLinksPerMessage) return indicators;
       seen.add(indicator);
       indicators.push(indicator);
     }
@@ -248,7 +327,7 @@ export function reputationIndicatorsForCheck(
 
 export function analyzeText(value: string): WebCheckResult {
   const text = value.trim();
-  if (!text) return resultFor([], "the text provided");
+  if (!text) return unverifiedMessageResult();
 
   const signals: WebCheckSignal[] = [];
   if (patterns.urgency.test(text)) signals.push(signal("urgency", "Pressure or urgency", "The wording pushes for action before there is time to verify."));
@@ -258,7 +337,7 @@ export function analyzeText(value: string): WebCheckResult {
   if (patterns.impersonation.test(text)) signals.push(signal("impersonation", "Claimed trusted identity", "A familiar organization name can be copied. Verify through contact information you find independently."));
   if (patterns.remoteAccess.test(text)) signals.push(signal("remote_access", "Remote device access", "Unexpected requests to install remote-control software can expose accounts and files."));
 
-  let inspectedLinks = 0;
+  const inspectedLinks = new Set<string>();
   for (const tokenMatch of text.matchAll(boundedTextTokenPattern)) {
     const linkValue = trimLinkToken(tokenMatch[1]);
     if (
@@ -266,20 +345,24 @@ export function analyzeText(value: string): WebCheckResult {
       || linkValue.length > maximumLinkCharacters
       || !shouldInspectTextLink(linkValue)
     ) continue;
-    if (inspectedLinks >= maximumLinksPerMessage) {
+    const inspectionKey = inspectionKeyForLink(linkValue);
+    if (inspectedLinks.has(inspectionKey)) continue;
+    if (inspectedLinks.size >= maximumLinksPerMessage) {
       if (!signals.some((existing) => existing.code === "many_links")) {
         signals.push(signal("many_links", "Many destinations", "The message contains more links than this check inspects individually. Verify every destination independently."));
       }
       break;
     }
-    inspectedLinks += 1;
+    inspectedLinks.add(inspectionKey);
     const linkResult = analyzeLink(linkValue);
     for (const item of linkResult.signals) {
       if (item.code !== "limited_evidence" && !signals.some((existing) => existing.code === item.code)) signals.push(item);
     }
   }
 
-  return resultFor(signals, "this message");
+  return signals.length === 0
+    ? unverifiedMessageResult()
+    : resultFor(signals, "this message");
 }
 
 export function analyzeLink(value: string): WebCheckResult {
@@ -312,6 +395,11 @@ export function analyzeLink(value: string): WebCheckResult {
     ));
   }
   if (url.protocol !== "https:") signals.push(signal("unencrypted", "No encrypted connection", "This address does not begin with HTTPS. Do not enter personal or payment information."));
+  if (url.search) signals.push(signal(
+    "query_not_verified",
+    "Address parameters need verification",
+    "PauseSure removes address parameters before reputation lookup. A redirect or destination carried in them cannot support a Likely safe result.",
+  ));
   if (url.username || url.password || raw.includes("@")) signals.push(signal("embedded_identity", "Hidden destination pattern", "The address includes identity text that can make a different destination look legitimate."));
   if (hostname.isNumeric) signals.push(signal("ip_host", "Numeric destination", "The address uses a numeric host instead of a recognizable organization domain."));
   if (host.includes("xn--")) signals.push(signal("encoded_host", "Encoded domain name", "Internationalized domain encoding can be legitimate, but it can also imitate familiar letters."));
