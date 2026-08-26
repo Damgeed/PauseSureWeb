@@ -4,16 +4,17 @@ import { Arrow, ReleaseBanner, SiteFooter, SiteHeader, StaticImage } from "../si
 
 export const metadata = pageMetadata({
   title: "Product",
-  description: "Explore PauseSure's decision-support tools for suspicious messages, links, QR codes, screenshots, calls, and trusted-family support.",
+  description: "Explore PauseSure's decision-support tools for suspicious messages, links, QR codes, screenshots, after-call evidence, protection setup, and trusted support.",
   path: "/product",
 });
 
 const inputs = [
   ["Message", "Paste a text or email and review pressure, impersonation, payment, and secrecy signals."],
-  ["Link", "Inspect the destination and learn how to verify through an official channel you find independently."],
+  ["Link", "Inspect the address structure and learn how to verify through an official channel you find independently. PauseSure does not silently open the destination."],
   ["Screenshot", "Extract visible text from a selected screenshot and turn it into a readable review."],
   ["QR code", "Read a code before following it, then separate the destination from the story around it."],
-  ["Audio or voicemail", "Import a supported audio file or voicemail and review it in the same calm workflow."],
+  ["Audio or voicemail", "Import a supported file you select and review its transcript in the same calm workflow. PauseSure does not record live cellular calls."],
+  ["Protection setup", "Review the iPhone settings and local readiness states PauseSure can inspect, with manual checks clearly identified."],
   ["Trusted Circle", "Ask a chosen person for a second opinion without creating a surveillance dashboard."],
 ];
 
@@ -26,7 +27,7 @@ export default function ProductPage() {
         <div className="page-hero-copy">
           <p className="eyebrow"><span /> Product</p>
           <h1>One calm place to check what feels off.</h1>
-          <p>PauseSure brings suspicious messages, links, screenshots, QR codes, calls, and family support into one decision process—without pretending uncertainty is certainty.</p>
+          <p>PauseSure brings suspicious messages, links, screenshots, QR codes, selected after-call evidence, and trusted support into one decision process—without pretending uncertainty is certainty.</p>
           <div className="hero-actions"><Link className="button button-primary" href="/how-it-works">See how it works <Arrow /></Link><Link className="button button-secondary" href="/safety">Safety by design</Link></div>
         </div>
         <div className="decision-console" aria-label="Example PauseSure review">
