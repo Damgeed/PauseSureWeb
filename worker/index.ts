@@ -11,7 +11,7 @@ interface Env extends PrivacyEventEnv {
 const contentSecurityPolicy = [
   "default-src 'self'",
   "base-uri 'none'",
-  "connect-src 'self'",
+  "connect-src 'self' https://pausesure-production.up.railway.app",
   "font-src 'self'",
   "form-action 'self'",
   "frame-ancestors 'none'",
@@ -49,8 +49,8 @@ function withSecurityHeaders(response: Response): Response {
   });
 }
 
-function isLocalDevelopmentHost(hostname: string) {
-  // Production is canonical-only. Local HTTP remains available solely for the
+function isDevelopmentHost(hostname: string) {
+  // Production is canonical-only. HTTP preview access remains available solely for the
   // Vite/Workers development runtime and is never a configured public route.
   return hostname === "localhost" || hostname === "127.0.0.1" || hostname === "[::1]";
 }
@@ -66,12 +66,12 @@ const worker = {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
     const hostname = url.hostname.toLowerCase();
-    const isLocalDevelopment = isLocalDevelopmentHost(hostname);
+    const isDevelopment = isDevelopmentHost(hostname);
 
-    if (!isLocalDevelopment && (url.protocol !== "https:" || hostname === "www.pausesure.com")) {
+    if (!isDevelopment && (url.protocol !== "https:" || hostname === "www.pausesure.com")) {
       return withSecurityHeaders(canonicalRedirect(url));
     }
-    if (!isLocalDevelopment && url.origin !== canonicalOrigin) {
+    if (!isDevelopment && url.origin !== canonicalOrigin) {
       return withSecurityHeaders(new Response("Misdirected Request", { status: 421 }));
     }
 
