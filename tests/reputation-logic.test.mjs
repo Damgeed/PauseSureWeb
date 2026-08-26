@@ -132,12 +132,20 @@ test("uses Likely safe for a clean direct link only when its lookup returns no k
   assert.ok(parsed);
   const noMatch = providerEvidence(submittedURL, parsed);
 
-  assert.equal(rules.label, "Likely safe");
+  assert.equal(rules.label, "Couldn’t verify");
   assert.equal(combineReputationDecision(rules, [noMatch]).label, "Likely safe");
   assert.equal(
     combineReputationDecision(rules, [noMatch, transportFailureEvidence("https://pausesure.com/check", now)]).label,
     "Couldn’t verify",
   );
+});
+
+test("zero provider evidence can never produce Likely safe", () => {
+  const rules = analyzeLink("https://example.com/news");
+  const combined = combineReputationDecision(rules, []);
+
+  assert.equal(combined.label, "Couldn’t verify");
+  assert.match(combined.summary, /did not receive a usable live threat-intelligence result/i);
 });
 
 test("does not turn an unverified message into Likely safe after URL no-match", () => {
