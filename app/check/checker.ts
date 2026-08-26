@@ -1,3 +1,5 @@
+import { ianaTopLevelDomains } from "./iana-top-level-domains.js";
+
 export type WebCheckKind = "text" | "link" | "phone" | "screenshot" | "qr";
 
 export type WebRisk = "high" | "unclear" | "insufficient";
@@ -28,6 +30,56 @@ const patterns = {
 
 const shorteners = new Set(["bit.ly", "tinyurl.com", "t.co", "goo.gl", "ow.ly", "is.gd", "buff.ly"]);
 const maximumLinksPerMessage = 8;
+const maximumLinkCharacters = 2_048;
+const boundedTextTokenPattern = new RegExp(
+  `(?:^|\\s)(\\S{1,${maximumLinkCharacters}})(?=\\s|$)`,
+  "gu",
+);
+const leadingLinkPunctuation = new Set(["<", "(", "[", "{", "\"", "'", "“", "‘"]);
+const trailingLinkPunctuation = new Set([">", ")", "]", "}", "\"", "'", "”", "’", ".", ",", "!", "?", ";", ":"]);
+
+interface HostnameInspection {
+  normalizedHostname: string;
+  labelCount: number;
+  isNumeric: boolean;
+  hasValidSyntax: boolean;
+  hasRecognizedTopLevelDomain: boolean;
+}
+
+function inspectHostname(hostname: string): HostnameInspection {
+  const normalizedHostname = hostname.toLowerCase().replace(/\.$/, "");
+  const labels = normalizedHostname.split(".");
+  const isIpv4 = /^\d{1,3}(?:\.\d{1,3}){3}$/.test(normalizedHostname);
+  const isIpv6 = normalizedHostname.startsWith("[")
+    && normalizedHostname.endsWith("]")
+    && normalizedHostname.includes(":");
+  const isNumeric = isIpv4 || isIpv6;
+  const hasValidSyntax = normalizedHostname.length > 0
+    && normalizedHostname.length <= 253
+    && labels.every((label) =>
+      label.length >= 1
+      && label.length <= 63
+      && /^[a-z\d](?:[a-z\d-]*[a-z\d])?$/i.test(label),
+    );
+
+  return {
+    normalizedHostname,
+    labelCount: labels.length,
+    isNumeric,
+    hasValidSyntax,
+    hasRecognizedTopLevelDomain: hasValidSyntax
+      && labels.length >= 2
+      && ianaTopLevelDomains.has(labels[labels.length - 1]),
+  };
+}
+
+function trimLinkToken(token: string): string {
+  let start = 0;
+  let end = token.length;
+  while (start < end && leadingLinkPunctuation.has(token[start])) start += 1;
+  while (end > start && trailingLinkPunctuation.has(token[end - 1])) end -= 1;
+  return token.slice(start, end);
+}
 
 function normalizeWebAddress(value: string): string {
   const raw = value.trim();
@@ -40,24 +92,53 @@ function normalizeWebAddress(value: string): string {
   if (/^[a-z][a-z\d+.-]*:(?!\d+(?:[/?#]|$))/i.test(raw)) return raw;
   if (raw.startsWith("//")) return `https:${raw}`;
 
-  // Only add HTTPS when the input parses as a recognizable domain or numeric
-  // host. This avoids turning arbitrary text into something URL-shaped while
-  // still accepting common pasted forms such as www.example.com/path.
+  // Only add HTTPS when the input parses as a syntactically valid dotted
+  // hostname or numeric host. This avoids turning arbitrary text into
+  // something URL-shaped while accepting forms such as www.example.com/path.
   if (/[\s\\]/.test(raw)) return raw;
 
   try {
     const candidate = new URL(`https://${raw}`);
-    const host = candidate.hostname.toLowerCase();
-    const domainLabels = host.split(".");
-    const isDomain = domainLabels.length >= 2 && domainLabels.every((label) =>
-      /^[a-z\d](?:[a-z\d-]{0,61}[a-z\d])?$/i.test(label),
-    );
-    const isIpv4 = /^\d{1,3}(?:\.\d{1,3}){3}$/.test(host);
-    const isIpv6 = host.startsWith("[") && host.endsWith("]") && host.includes(":");
+    const hostname = inspectHostname(candidate.hostname);
 
-    return isDomain || isIpv4 || isIpv6 ? candidate.toString() : raw;
+    return hostname.isNumeric || (hostname.hasValidSyntax && hostname.labelCount >= 2)
+      ? candidate.toString()
+      : raw;
   } catch {
     return raw;
+  }
+}
+
+function looksLikeStandaloneEmail(value: string): boolean {
+  const firstAt = value.indexOf("@");
+  if (firstAt <= 0 || firstAt !== value.lastIndexOf("@")) return false;
+
+  const destination = value.slice(firstAt + 1);
+  return !/[/?#]/.test(destination) && !/:\d+(?:$)/.test(destination);
+}
+
+function shouldInspectTextLink(value: string): boolean {
+  if (/^(?:https?:\/\/|\/\/|www\.)/i.test(value)) return true;
+
+  // Preserve domain:port while refusing to reinterpret custom schemes as
+  // HTTPS, and leave ordinary email addresses out of message-link analysis.
+  if (/^[a-z][a-z\d+.-]*:(?!\d+(?:[/?#]|$))/i.test(value)) return false;
+  if (looksLikeStandaloneEmail(value)) return false;
+  if (!/[.@\[\]]/u.test(value)) return false;
+
+  try {
+    const candidate = new URL(normalizeWebAddress(value));
+    if (!["http:", "https:"].includes(candidate.protocol) || !candidate.hostname) return false;
+
+    const hostname = inspectHostname(candidate.hostname);
+    if (hostname.isNumeric) {
+      return Boolean(candidate.username || candidate.password)
+        || /^(?:\d{1,3}\.){3}\d{1,3}(?::\d+)?(?:[/?#]|$)/.test(value)
+        || /^\[[a-f\d:]+\](?::\d+)?(?:[/?#]|$)/i.test(value);
+    }
+    return hostname.hasRecognizedTopLevelDomain;
+  } catch {
+    return false;
   }
 }
 
@@ -127,7 +208,13 @@ export function analyzeText(value: string): WebCheckResult {
   if (patterns.remoteAccess.test(text)) signals.push(signal("remote_access", "Remote device access", "Unexpected requests to install remote-control software can expose accounts and files."));
 
   let inspectedLinks = 0;
-  for (const linkMatch of text.matchAll(/(?:https?:\/\/|www\.)[^\s<>()]+/gi)) {
+  for (const tokenMatch of text.matchAll(boundedTextTokenPattern)) {
+    const linkValue = trimLinkToken(tokenMatch[1]);
+    if (
+      !linkValue
+      || linkValue.length > maximumLinkCharacters
+      || !shouldInspectTextLink(linkValue)
+    ) continue;
     if (inspectedLinks >= maximumLinksPerMessage) {
       if (!signals.some((existing) => existing.code === "many_links")) {
         signals.push(signal("many_links", "Many destinations", "The message contains more links than this first check inspects individually. Verify every destination independently."));
@@ -135,7 +222,7 @@ export function analyzeText(value: string): WebCheckResult {
       break;
     }
     inspectedLinks += 1;
-    const linkResult = analyzeLink(linkMatch[0]);
+    const linkResult = analyzeLink(linkValue);
     for (const item of linkResult.signals) {
       if (item.code !== "limited_evidence" && !signals.some((existing) => existing.code === item.code)) signals.push(item);
     }
@@ -158,10 +245,24 @@ export function analyzeLink(value: string): WebCheckResult {
     return resultFor([signal("invalid_link", "Unsupported link type", "PauseSure checks HTTP and HTTPS website addresses. Other link types need a different verification route.")], "this link");
   }
 
-  const host = url.hostname.toLowerCase();
+  const hostname = inspectHostname(url.hostname);
+  const host = hostname.normalizedHostname;
+  if (!hostname.isNumeric && !hostname.hasValidSyntax) {
+    signals.push(signal(
+      "invalid_link",
+      "Invalid website address",
+      "The destination name is malformed. Each part must use letters, numbers, or interior hyphens and stay within standard length limits.",
+    ));
+  } else if (!hostname.isNumeric && !hostname.hasRecognizedTopLevelDomain) {
+    signals.push(signal(
+      "invalid_link",
+      "Incomplete website address",
+      "This address does not end in a recognized top-level domain such as .com, .ai, or .co. Do not guess the missing ending; ask for or find the complete address independently.",
+    ));
+  }
   if (url.protocol !== "https:") signals.push(signal("unencrypted", "No encrypted connection", "This address does not begin with HTTPS. Do not enter personal or payment information."));
   if (url.username || url.password || raw.includes("@")) signals.push(signal("embedded_identity", "Hidden destination pattern", "The address includes identity text that can make a different destination look legitimate."));
-  if (/^\d{1,3}(?:\.\d{1,3}){3}$/.test(host) || host.includes(":")) signals.push(signal("ip_host", "Numeric destination", "The address uses a numeric host instead of a recognizable organization domain."));
+  if (hostname.isNumeric) signals.push(signal("ip_host", "Numeric destination", "The address uses a numeric host instead of a recognizable organization domain."));
   if (host.includes("xn--")) signals.push(signal("encoded_host", "Encoded domain name", "Internationalized domain encoding can be legitimate, but it can also imitate familiar letters."));
   if (url.port && !["80", "443"].includes(url.port)) signals.push(signal("unusual_port", "Unusual network port", "The address uses a nonstandard port that deserves additional verification."));
   if (host.split(".").length > 4) signals.push(signal("deep_subdomain", "Long destination name", "Important organization names placed early in a long address may not control the actual domain."));

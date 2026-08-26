@@ -26,10 +26,60 @@ test("explains structurally suspicious link patterns", () => {
 });
 
 test("accepts common bare domains as HTTPS web addresses", () => {
-  for (const input of ["www.example.com", "example.com/help", "//www.example.com/help"]) {
+  for (const input of [
+    "pausesure.com",
+    "www.pausesure.com",
+    "pausesure.ai/help",
+    "pausesure.co/check",
+    "//www.example.com/help",
+  ]) {
     const result = analyzeLink(input);
     assert.ok(!result.signals.some((item) => item.code === "invalid_link"), `${input} should parse`);
     assert.ok(!result.signals.some((item) => item.code === "unencrypted"), `${input} should default to HTTPS`);
+  }
+});
+
+test("flags website-like addresses that are missing a recognized top-level domain", () => {
+  for (const input of [
+    "pausesure",
+    "www.pausesure",
+    "www.pausesure/account/verify",
+    "https://pausesure",
+    "https://www.pausesure",
+    "pausesure.not-a-tld",
+  ]) {
+    const result = analyzeLink(input);
+    assert.ok(result.signals.some((item) => item.code === "invalid_link"), `${input} should be flagged as incomplete`);
+    assert.notEqual(result.risk, "insufficient", `${input} should not look like a no-signal result`);
+  }
+});
+
+test("recognizes internationalized top-level domains from the IANA root-zone list", () => {
+  const result = analyzeLink("食狮.中国");
+  assert.ok(!result.signals.some((item) => item.code === "invalid_link"));
+  assert.ok(result.signals.some((item) => item.code === "encoded_host"));
+});
+
+test("rejects malformed hostnames even when an explicit web scheme parses", () => {
+  for (const input of [
+    "https://foo_bar.com",
+    "https://-bad.com",
+    "https://bad-.com",
+    "https://foo..com",
+    "https://.com",
+    `https://${"a".repeat(64)}.com`,
+    `https://${Array.from({ length: 4 }, () => "a".repeat(63)).join(".")}.com`,
+  ]) {
+    const result = analyzeLink(input);
+    assert.ok(result.signals.some((item) => item.code === "invalid_link"), `${input} should have invalid hostname syntax`);
+    assert.notEqual(result.risk, "insufficient");
+  }
+});
+
+test("accepts a valid maximum-length label and a trailing DNS root dot", () => {
+  for (const input of [`${"a".repeat(63)}.com`, "https://example.com."]) {
+    const result = analyzeLink(input);
+    assert.ok(!result.signals.some((item) => item.code === "invalid_link"), `${input} should have valid hostname syntax`);
   }
 });
 
@@ -55,6 +105,47 @@ test("does not turn arbitrary text into a web address", () => {
 test("inspects a bare www address when it appears inside message text", () => {
   const result = analyzeText("Please sign in at www.example.com/account/verify");
   assert.ok(result.signals.some((item) => item.code === "sensitive_path"));
+});
+
+test("inspects a complete bare domain when it appears inside message text", () => {
+  const result = analyzeText("Please sign in at pausesure.com/account/verify.");
+  assert.ok(result.signals.some((item) => item.code === "sensitive_path"));
+  assert.ok(!result.signals.some((item) => item.code === "invalid_link"));
+});
+
+test("does not reinterpret domain-shaped substrings inside non-web text", () => {
+  const email = analyzeText("Write to security@pausesure.com or security.team@pausesure.com if you have a question.");
+  assert.ok(!email.signals.some((item) => item.code === "invalid_link"));
+  assert.ok(!email.signals.some((item) => item.code === "sensitive_path"));
+
+  const unsupportedScheme = analyzeText("The app callback is custom:pausesure.com/account/verify");
+  assert.ok(!unsupportedScheme.signals.some((item) => item.code === "sensitive_path"));
+
+  const versionNumber = analyzeText("Version 1.2 is ready.");
+  assert.ok(!versionNumber.signals.some((item) => item.code === "ip_host"));
+});
+
+test("preserves complete suspicious bare link tokens inside message text", () => {
+  const cases = [
+    ["trusted.com@evil.com/account/verify", ["embedded_identity", "sensitive_path"]],
+    ["trusted.com@192.0.2.9:8080/account/verify", ["embedded_identity", "ip_host", "unusual_port", "sensitive_path"]],
+    ["192.0.2.9/account/verify", ["ip_host", "sensitive_path"]],
+    ["//evil.com/account/verify", ["sensitive_path"]],
+    ["аррӏе.com/account/verify", ["encoded_host", "sensitive_path"]],
+  ];
+
+  for (const [value, expectedSignals] of cases) {
+    const result = analyzeText(`Open (${value}).`);
+    for (const expectedSignal of expectedSignals) {
+      assert.ok(result.signals.some((item) => item.code === expectedSignal), `${value} should produce ${expectedSignal}`);
+    }
+  }
+});
+
+test("flags an incomplete www address when it appears inside message text", () => {
+  const result = analyzeText("Please sign in at www.pausesure before the deadline");
+  assert.ok(result.signals.some((item) => item.code === "invalid_link"));
+  assert.notEqual(result.risk, "insufficient");
 });
 
 test("analyzes decoded QR destinations as links", () => {

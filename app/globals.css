@@ -388,6 +388,7 @@ footer { width: min(1180px, calc(100% - 40px)); margin: auto; padding: 3.5rem 0 
 .checker-input-panel textarea, .checker-input-panel > input { width: 100%; color: var(--ink); background: white; border: 1px solid #cbd9de; border-radius: 15px; padding: 1rem; font: inherit; font-size: .95rem; line-height: 1.65; resize: vertical; }
 .checker-input-panel > input { min-height: 56px; }
 .checker-input-panel textarea:focus, .checker-input-panel > input:focus { outline: 3px solid rgba(119,234,236,.5); border-color: var(--action-dark); }
+.checker-field-help { color: var(--muted); font-size: .74rem; line-height: 1.5; margin: -.1rem 0 .65rem; }
 .checker-controls { display: flex; align-items: center; gap: .8rem; margin-top: 1rem; }
 .checker-submit { border: 0; cursor: pointer; }
 .checker-submit:disabled { opacity: .45; cursor: not-allowed; }
