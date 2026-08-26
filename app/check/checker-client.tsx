@@ -423,7 +423,7 @@ export default function CheckerClient() {
 
         <label className="analytics-choice">
           <input type="checkbox" checked={analyticsEnabled} onChange={(event) => updateAnalytics(event.target.checked)} />
-          <span><strong>Help improve PauseSure</strong><small>Share content-free counts such as “link check completed” and the broad result. Your entry, URL, number, image, IP, device ID and contact information are not stored in these counts.</small></span>
+          <span><strong>Share product-use counts</strong><small>Share content-free counts such as “link check completed” and the broad result. These counts measure feature use and flow reliability; they cannot identify false negatives, provide labeled examples, calibrate detection accuracy, or train a classifier. Your entry, URL, number, image, IP, device ID and contact information are not stored in these counts.</small></span>
         </label>
       </aside>
     </div>
