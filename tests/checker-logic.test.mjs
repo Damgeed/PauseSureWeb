@@ -25,10 +25,17 @@ test("uses the approved unclear wording for a single warning signal", () => {
 });
 
 test("uses the approved likely-safe wording without making a guarantee", () => {
-  const result = analyzeText("Can we talk tomorrow afternoon?");
+  const result = analyzeLink("https://pausesure.com/about");
   assert.equal(result.risk, "insufficient");
   assert.equal(result.label, "Likely safe");
   assert.equal(result.limitation, "Likely safe is not a guarantee.");
+});
+
+test("does not label an unverified message likely safe", () => {
+  const result = analyzeText("Can we talk tomorrow afternoon?");
+  assert.equal(result.risk, "unclear");
+  assert.equal(result.label, "Couldn’t verify");
+  assert.match(result.limitation, /not a calibrated multilingual accuracy benchmark/i);
 });
 
 test("normalizes only complete web addresses for reputation lookup", () => {
@@ -247,7 +254,7 @@ test("uses exactly the four approved customer decision labels", () => {
   const labels = [
     analyzeText("Act now. Buy gift cards and do not tell anyone.").label,
     analyzeText("This is urgent.").label,
-    analyzeText("Can we talk tomorrow?").label,
+    analyzeLink("https://pausesure.com/about").label,
     analyzePhone("+1 202 555 0123").label,
   ];
   assert.deepEqual(labels, ["High risk", "Unclear", "Likely safe", "Couldn’t verify"]);
