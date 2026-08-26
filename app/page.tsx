@@ -1,6 +1,5 @@
 import Link from "next/link";
-import { releaseMessaging } from "./release";
-import { Arrow, ReleaseBanner, ReleaseLink, SiteFooter, SiteHeader, StaticImage } from "./site-shell";
+import { Arrow, ReleaseBanner, SiteFooter, SiteHeader, StaticImage } from "./site-shell";
 
 const SignalIcon = ({ name }: { name: "pause" | "check" | "verify" | "circle" | "recover" }) => {
   const paths = {
@@ -24,7 +23,7 @@ export default function Home() {
           <div className="hero-glow hero-glow-two" />
           <div className="hero-shell">
             <div className="hero-copy">
-              <div className="eyebrow"><span /> PauseSure for iPhone · Clear decisions under pressure</div>
+              <div className="eyebrow"><span /> PauseSure decision support · Clear decisions under pressure</div>
               <h1>Pause before pressure becomes a payment.</h1>
               <p className="hero-lede">
                 PauseSure helps you slow down, inspect suspicious requests, verify them independently,
@@ -32,7 +31,7 @@ export default function Home() {
               </p>
               <div className="hero-actions">
                 <Link className="button button-primary" href="/check">Check something now <Arrow /></Link>
-                <ReleaseLink className="button button-secondary" />
+                <Link className="button button-secondary" href="/product">Explore the iPhone app <Arrow /></Link>
               </div>
               <div className="hero-assurances" aria-label="Product principles">
                 <span><i>✓</i> Calm, explainable guidance</span>
@@ -105,7 +104,7 @@ export default function Home() {
               <source src="/pausesure-intro.mp4" type="video/mp4" />
               Your browser does not support embedded video.
             </video>
-            <figcaption>A 15-second look at the PauseSure decision flow. Official iPhone availability is verified on pausesure.com.</figcaption>
+            <figcaption>A 15-second look at the PauseSure decision flow: pause, inspect the evidence, verify elsewhere, involve trusted help, and recover.</figcaption>
             <details className="video-transcript">
               <summary>Read the video description</summary>
               <p>The film introduces the PauseSure mark, shows a suspicious request moving through a calm review, highlights explainable warning signals, and ends with the Pause, Check, Verify, Involve, and Recover decision flow.</p>
@@ -169,7 +168,7 @@ export default function Home() {
             <div className="trust-grid">
               <article><span>01</span><h3>Minimized processing</h3><p>Each supported feature uses the narrowest practical processing route and only the information needed for the action you choose.</p></article>
               <article><span>02</span><h3>Share by choice</h3><p>PauseSure reviews items you deliberately select or share. Access is limited to the permissions each feature needs.</p></article>
-              <article><span>03</span><h3>Protected records</h3><p>Release reviews cover storage protection, connected-data encryption, retention, access control, and deletion as one system.</p></article>
+              <article><span>03</span><h3>Protected records</h3><p>Storage protection, connected-data encryption, retention, access control, and deletion are treated as one system.</p></article>
               <article><span>04</span><h3>No false certainty</h3><p>A failed lookup never means “safe.” We explain evidence and limitations and direct high-risk cases to official help.</p></article>
             </div>
           </div>
@@ -198,8 +197,8 @@ export default function Home() {
           <div className="faq-list">
             <details open><summary>Can PauseSure guarantee that something is safe?<span>+</span></summary><p>No. No tool can reliably guarantee that a person, message, link, or transaction is safe. PauseSure is decision support: it surfaces warning signals and helps you verify independently.</p></details>
             <details><summary>Does PauseSure replace my bank, police, or emergency services?<span>+</span></summary><p>No. If money has moved, an account may be compromised, or anyone is in immediate danger, contact the relevant bank, platform, police, or emergency service directly using an official channel.</p></details>
-            <details><summary>Will my checks be used for advertising or sold?<span>+</span></summary><p>No. PauseSure does not use checks for behavioral advertising, cross-app tracking, or selling personal data. Read the current Privacy Notice for the website and authorized testing boundaries.</p></details>
-            <details><summary>Where can I download PauseSure?<span>+</span></summary><p>{releaseMessaging.availability}</p></details>
+            <details><summary>Will my checks be used for advertising or sold?<span>+</span></summary><p>No. PauseSure does not use checks for behavioral advertising, cross-app tracking, or selling personal data. The current Privacy Notice explains the website and app data paths.</p></details>
+            <details><summary>Where can I use PauseSure?<span>+</span></summary><p>Use the private browser checker on pausesure.com now. The Product page also explains the iPhone app workflows and protection tools.</p></details>
           </div>
         </section>
 

@@ -12,3 +12,7 @@
 
 /*.mp4
   Cache-Control: public, max-age=604800, stale-while-revalidate=86400
+
+/scam-pulse/*.json
+  Cache-Control: public, max-age=300, must-revalidate
+  Content-Type: application/json; charset=utf-8

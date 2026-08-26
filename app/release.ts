@@ -1,4 +1,4 @@
-export type ReleaseStage = "not-listed" | "app-store";
+export type ReleaseStage = "web" | "app-store";
 
 type ReleaseConfig = {
   stage: ReleaseStage;
@@ -6,11 +6,12 @@ type ReleaseConfig = {
   appStoreUrl: string | null;
 };
 
-// Release switch: after Apple approves the public listing, set stage to
-// "app-store" and paste the verified apps.apple.com URL. Every public
-// availability message and download action is derived from this object.
+// PauseSure always has a usable first-party route. After Apple approves the
+// public listing, set stage to "app-store" and paste the verified
+// apps.apple.com URL. Until then, public actions lead to the browser checker
+// instead of presenting an unavailable download control.
 export const releaseConfig: ReleaseConfig = {
-  stage: "not-listed",
+  stage: "web",
   platform: "iPhone",
   appStoreUrl: null,
 };
@@ -31,8 +32,8 @@ export const releaseAction = hasVerifiedAppStoreListing
       href: releaseConfig.appStoreUrl as string,
     }
   : {
-      label: "Check iPhone availability",
-      href: "/company#availability",
+      label: "Check something now",
+      href: "/check",
     };
 
 export const releaseMessaging = hasVerifiedAppStoreListing
@@ -46,15 +47,19 @@ export const releaseMessaging = hasVerifiedAppStoreListing
       statusLabel: "Current availability",
       statusValue: "Available on the App Store",
       footer: "PauseSure for iPhone.",
+      actionNote:
+        "Download PauseSure only from the verified App Store link on pausesure.com. Never trust a download link supplied inside an urgent message.",
     }
   : {
-      eyebrow: "PauseSure for iPhone",
+      eyebrow: "Use PauseSure now",
       headline: "A calmer way to handle suspicious requests.",
       summary:
-        "The official iPhone download link will appear on pausesure.com as soon as App Store distribution is verified. Return here for the verified release—not a link sent under pressure.",
+        "Check a message, link, phone number, screenshot, or QR code in your browser and get explainable warning signals with practical next steps.",
       availability:
-        "PauseSure is not yet listed on the App Store. The verified download link will appear only on pausesure.com when it becomes available.",
-      statusLabel: "Current availability",
-      statusValue: "Not yet listed on the App Store",
-      footer: "PauseSure for iPhone. Official availability is verified here.",
+        "The PauseSure browser checker is available now on pausesure.com. It runs the selected check in your browser and does not fetch user-submitted destinations.",
+      statusLabel: "Available now",
+      statusValue: "Private browser checker",
+      footer: "Pause. Check. Verify. Involve. Recover.",
+      actionNote:
+        "Your checked content stays in this browser. Optional content-free analytics are off by default and never include the message, link, phone number, image, or QR code you check.",
     };

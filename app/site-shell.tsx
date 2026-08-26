@@ -28,13 +28,13 @@ export function ReleaseLink({ className }: { className: string }) {
 
 export function ReleaseBanner() {
   return (
-    <section className="launch-section" id="availability" aria-labelledby="availability-title">
+    <section className="launch-section" id="start" aria-labelledby="start-title">
       <div className="launch-logo"><StaticImage src="/brand/pausesure-logo.png" width={92} height={92} alt="PauseSure logo" /></div>
       <p className="section-kicker light">{releaseMessaging.eyebrow}</p>
-      <h2 id="availability-title">{releaseMessaging.headline}</h2>
+      <h2 id="start-title">{releaseMessaging.headline}</h2>
       <p>{releaseMessaging.summary}</p>
       <ReleaseLink className="button button-white" />
-      <small>Download PauseSure only from the verified link on pausesure.com. Never share passwords, verification codes, payment details, or sensitive case evidence through an unverified contact route.</small>
+      <small>{releaseMessaging.actionNote}</small>
     </section>
   );
 }

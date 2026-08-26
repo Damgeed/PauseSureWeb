@@ -1,0 +1,52 @@
+{
+  "schemaVersion": 1,
+  "sourceID": "pausesure-curated-v1",
+  "generatedAt": "2026-08-26T08:20:00Z",
+  "campaigns": [
+    {
+      "id": "sg-scamshield-ecommerce-2026-h1",
+      "title": "Singapore reports a rise in first-half 2026 e-commerce scams",
+      "summary": "ScamShield's official situation report records 3,865 e-commerce scam cases and S$8.3 million in reported losses in the first half of 2026. Pre-order scams involving Pokémon trading cards were a prominent trend. Verify sellers, listings, and payment routes independently before paying.",
+      "category": "E-commerce scams",
+      "regions": [
+        "Singapore"
+      ],
+      "publishedAt": "2026-08-24T00:00:00Z",
+      "sourceURL": "https://www.scamshield.gov.sg/resources/essr/"
+    },
+    {
+      "id": "us-ic3-impersonation-revictimization-2026-07",
+      "title": "FBI warns that scammers are impersonating the Internet Crime Complaint Center",
+      "summary": "The FBI says criminals are targeting previous fraud victims while impersonating IC3 or FBI personnel. Reported tactics include recovery promises, AI-generated videos, spoofed websites, urgency, and requests for money or personal information. IC3 does not contact people through social media or offer fund-recovery services.",
+      "category": "Government impersonation",
+      "regions": [
+        "United States"
+      ],
+      "publishedAt": "2026-07-20T00:00:00Z",
+      "sourceURL": "https://www.ic3.gov/PSA/2026/PSA260720"
+    },
+    {
+      "id": "us-ic3-malicious-web-redirects-2026-06",
+      "title": "FBI warns about redirects to fraudulent websites",
+      "summary": "The FBI warns that criminal traffic-distribution systems can route people from phishing messages, poisoned search results, advertisements, or compromised websites to fake login pages and malicious downloads. A familiar starting page does not guarantee the final destination is trustworthy.",
+      "category": "Phishing and malicious links",
+      "regions": [
+        "United States",
+        "Global"
+      ],
+      "publishedAt": "2026-06-18T00:00:00Z",
+      "sourceURL": "https://www.ic3.gov/PSA/2026/PSA260618"
+    },
+    {
+      "id": "us-ftc-fake-employee-id-2026-06",
+      "title": "FTC warns about fake employee IDs sent by text",
+      "summary": "The FTC warns that impostors may claim they can recover scam losses and send a fake employee ID or badge to build trust. A real FTC employee will not contact you by text or messaging app to offer recovery, direct you to move money, or request financial information.",
+      "category": "Refund and recovery scams",
+      "regions": [
+        "United States"
+      ],
+      "publishedAt": "2026-06-03T00:00:00Z",
+      "sourceURL": "https://consumer.ftc.gov/consumer-alerts/2026/06/real-ftc-employee-wont-text-you-their-photo-id-verify-their-identity"
+    }
+  ]
+}

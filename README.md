@@ -60,7 +60,9 @@ Do not add analytics, advertising pixels, form collection, authentication, or th
 
 ## Release state
 
-`app/release.ts` is the single source of truth for public iPhone availability, download actions, the Company status, homepage FAQ, and footer language. Do not hard-code availability elsewhere. Switch the state to `app-store` only after a verified `https://apps.apple.com/` listing resolves and the release, privacy, security, support, and account-deletion reviews are complete.
+`app/release.ts` is the single source of truth for the site-wide primary action and ready-state messaging. The `web` state always leads to the usable first-party browser checker. Switch the state to `app-store` only after a verified `https://apps.apple.com/` listing resolves and the release, privacy, security, support, and account-deletion reviews are complete. Never replace the web action with an unavailable download control.
+
+The reviewed Scam Pulse feed is published at `public/scam-pulse/v1.json`. Every campaign entry must link directly to an HTTPS government source, preserve that source's publication date, and pass the feed contract tests. A missing or stale source is uncertainty, never proof that a threat is absent.
 
 ## Operating documents
 
