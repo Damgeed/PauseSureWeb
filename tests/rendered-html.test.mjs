@@ -38,7 +38,7 @@ test("renders the public multi-page company site", async () => {
     assert.doesNotMatch(html, /(?:OpenAI|ChatGPT)/i, `${route} should not expose hosting-platform branding`);
     assert.doesNotMatch(html, /mailto:/i, `${route} should not advertise an unverified email route`);
     assert.doesNotMatch(html, /\/(?:_next|_vinext)\/image\?/i, `${route} should use deploy-safe image URLs`);
-    assert.doesNotMatch(html, /(?:in active development|still in development|pre-release|coming to iPhone|product in development|development-stage|private development)/i, `${route} should use deliberate launch-ready language`);
+    assert.doesNotMatch(html, /(?:in active development|still in development|pre-release|coming to iPhone|product in development|development-stage|private development|not yet listed|will appear when|when it becomes available|authorized testers|when available)/i, `${route} should use deliberate ready-state language`);
     const canonicalUrl = `https://pausesure.com${route === "/" ? "" : route}`;
     assert.ok(html.includes(`<link rel="canonical" href="${canonicalUrl}"/>`), `${route} should have a self-referencing canonical URL`);
     assert.ok(html.includes(`<meta property="og:url" content="${canonicalUrl}"/>`), `${route} should have a route-specific Open Graph URL`);
@@ -47,15 +47,75 @@ test("renders the public multi-page company site", async () => {
       if (appStoreEnabled) {
         assert.match(html, /Download on the App Store/i);
       } else {
-        assert.match(html, /Check iPhone availability/i);
+        assert.match(html, /Check something now/i);
+        assert.doesNotMatch(html, /Check iPhone availability/i);
         assert.doesNotMatch(html, /Download on the App Store/i);
       }
+    }
+
+    if (route === "/safety") {
+      assert.match(html, /Protection setup check/i);
+      assert.match(html, /It checks setup—not your private content/i);
+      assert.match(html, /does not inspect calls, messages, contacts, photos, links, screenshots, QR codes, or audio/i);
+      assert.match(html, /Protection tools/i);
+      assert.match(html, /does not record cellular calls or analyze live call audio/i);
     }
   }
 
   const missing = await worker.fetch(new Request("http://localhost/not-a-pause-sure-page", { headers: { accept: "text/html" } }), env, ctx);
   assert.equal(missing.status, 404, "unknown routes should return a real 404");
   assert.match(await missing.text(), /This link does not lead to a PauseSure page/i);
+});
+
+test("publishes a schema-valid Scam Pulse feed backed by official sources", async () => {
+  const raw = await readFile(new URL("../public/scam-pulse/v1.json", import.meta.url), "utf8");
+  const feed = JSON.parse(raw);
+  const allowedSourceHosts = new Set([
+    "pausesure.com",
+    "www.pausesure.com",
+    "consumer.ftc.gov",
+    "www.ftc.gov",
+    "ic3.gov",
+    "www.ic3.gov",
+    "scamshield.gov.sg",
+    "www.scamshield.gov.sg",
+    "ncsc.gov.uk",
+    "www.ncsc.gov.uk",
+  ]);
+
+  assert.equal(feed.schemaVersion, 1);
+  assert.equal(feed.sourceID, "pausesure-curated-v1");
+  assert.ok(Number.isFinite(Date.parse(feed.generatedAt)));
+  assert.ok(Date.parse(feed.generatedAt) <= Date.now() + 5 * 60 * 1000, "feed generation time must not be in the future");
+  assert.ok(Date.parse(feed.generatedAt) >= Date.now() - 14 * 24 * 60 * 60 * 1000, "reviewed feed must be regenerated at least every 14 days");
+  assert.ok(Array.isArray(feed.campaigns));
+  assert.ok(feed.campaigns.length >= 4);
+  assert.ok(feed.campaigns.length <= 250);
+
+  const identifiers = new Set();
+  const representedHosts = new Set();
+  for (const campaign of feed.campaigns) {
+    assert.equal(typeof campaign.id, "string");
+    assert.ok(campaign.id.length > 0);
+    assert.ok(!identifiers.has(campaign.id), `duplicate campaign id: ${campaign.id}`);
+    identifiers.add(campaign.id);
+    assert.ok(campaign.title.length > 0 && campaign.title.length <= 160);
+    assert.ok(campaign.summary.length > 0 && campaign.summary.length <= 600);
+    assert.ok(campaign.category.length > 0 && campaign.category.length <= 80);
+    assert.ok(Array.isArray(campaign.regions) && campaign.regions.length <= 20);
+    assert.ok(campaign.regions.every((region) => typeof region === "string" && region.length > 0 && region.length <= 80));
+    assert.ok(Number.isFinite(Date.parse(campaign.publishedAt)));
+    assert.ok(Date.parse(campaign.publishedAt) <= Date.now() + 5 * 60 * 1000, `${campaign.id} publication time must not be in the future`);
+    const source = new URL(campaign.sourceURL);
+    assert.equal(source.protocol, "https:");
+    assert.ok(allowedSourceHosts.has(source.hostname), `${campaign.id} must use a reviewed government source host`);
+    representedHosts.add(source.hostname);
+  }
+  assert.ok(representedHosts.size >= 3, "feed should retain independent official source coverage");
+
+  const headers = await readFile(new URL("../public/_headers", import.meta.url), "utf8");
+  assert.match(headers, /\/scam-pulse\/\*\.json[\s\S]*Content-Type:\s*application\/json; charset=utf-8/);
+  assert.match(headers, /\/scam-pulse\/\*\.json[\s\S]*Cache-Control:\s*public, max-age=300, must-revalidate/);
 });
 
 test("accepts only same-origin, allowlisted, content-free analytics", async () => {
