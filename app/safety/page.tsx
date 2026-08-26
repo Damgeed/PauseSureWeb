@@ -13,7 +13,7 @@ export default function SafetyPage() {
       <div className="commitment-grid">
         <article><span>01</span><h3>Caller identification</h3><p>Checks the iOS enabled state and whether a valid, current, nonempty caller-label snapshot is loaded. It does not prove a caller is genuine; caller ID can be spoofed.</p></article>
         <article><span>02</span><h3>Message and Share extensions</h3><p>Confirms that the extensions are included in the installed app. iOS does not tell PauseSure whether Message Filter is enabled or whether Share is visible or pinned, so those checks remain manual.</p></article>
-        <article><span>03</span><h3>Notifications and account</h3><p>Reads notification permission and whether a local signed-in session exists. It does not silently ping the backend or prove APNs registration, current connectivity, or delivery.</p></article>
+        <article><span>03</span><h3>Notifications and account</h3><p>Reads notification permission and whether an active signed-in session exists. It does not silently ping the backend or claim APNs registration, current connectivity, or delivery.</p></article>
         <article><span>04</span><h3>Strict inspection boundary</h3><p>The setup check does not inspect calls, messages, contacts, photos, links, screenshots, QR codes, or audio. It never runs a hidden scam scan.</p></article>
       </div>
     </section>
@@ -21,10 +21,11 @@ export default function SafetyPage() {
     <section className="section page-section" id="protection-tools">
       <div className="section-heading"><p className="section-kicker">Protection tools</p><h2>Investigate, involve, and recover.</h2><p>These are user-started tools, separate from the setup check. Each one has a defined purpose and a visible boundary.</p></div>
       <div className="commitment-grid">
-        <article><span>01</span><h3>Scam Pulse</h3><p>Shows manually reviewed entries that link directly to official government sources. It is not exhaustive or real-time, and an unavailable feed never means a threat is absent. <a href="/scam-pulse/v1.json">View the source-backed feed.</a></p></article>
-        <article><span>02</span><h3>After-call review</h3><p>Imports only the voicemail or recording you select. PauseSure does not record cellular calls or analyze live call audio.</p></article>
-        <article><span>03</span><h3>Trusted Circle</h3><p>Sends a request only after you choose the recipient and confirm what to share. Connected request content is encrypted before it leaves the device.</p></article>
-        <article><span>04</span><h3>Recovery plan</h3><p>Creates a practical checklist for contacting banks and affected services, securing accounts, preserving evidence, and reporting through independently verified official routes.</p></article>
+        <article><span>01</span><h3>URL threat intelligence</h3><p>Checks a minimized address against Google Web Risk and keeps provider credentials on PauseSure servers. A no-known-match response never overrides stronger warning signals.</p></article>
+        <article><span>02</span><h3>Scam Pulse</h3><p>Shows manually reviewed entries that link directly to official government sources. It is not exhaustive or real-time, and an unavailable feed never means a threat is absent. <a href="/scam-pulse/v1.json">View the source-backed feed.</a></p></article>
+        <article><span>03</span><h3>After-call review</h3><p>Imports only the voicemail or recording you select. PauseSure does not record cellular calls or analyze live call audio.</p></article>
+        <article><span>04</span><h3>Trusted Circle</h3><p>Sends a request only after you choose the recipient and confirm what to share. Connected request content is encrypted before it leaves the device.</p></article>
+        <article><span>05</span><h3>Recovery plan</h3><p>Creates a practical checklist for contacting banks and affected services, securing accounts, preserving evidence, and reporting through independently verified official routes.</p></article>
       </div>
     </section>
     <section className="section safety-links"><Link href="/privacy"><small>Policy</small><strong>Privacy</strong><p>What is collected, why, and the choices available to you.</p><span>Read policy →</span></Link><Link href="/security"><small>Practice</small><strong>Security</strong><p>Architecture, protection boundaries, reporting, and responsible disclosure.</p><span>Explore security →</span></Link><Link href="/account-deletion"><small>Control</small><strong>Account deletion</strong><p>How to request deletion and what the process covers.</p><span>View instructions →</span></Link></section>

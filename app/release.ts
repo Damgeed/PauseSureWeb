@@ -54,12 +54,12 @@ export const releaseMessaging = hasVerifiedAppStoreListing
       eyebrow: "Use PauseSure now",
       headline: "A calmer way to handle suspicious requests.",
       summary:
-        "Check a message, link, phone number, screenshot, or QR code in your browser and get explainable warning signals with practical next steps.",
+        "Check a message, link, phone number, screenshot, or QR code and get explainable warning signals, live URL intelligence, and practical next steps.",
       availability:
-        "The PauseSure browser checker is available now on pausesure.com. It runs the selected check in your browser and does not fetch user-submitted destinations.",
+        "The PauseSure browser checker is available on pausesure.com. It analyzes messages and images in the browser and sends only minimized web addresses through PauseSure to Google Web Risk without opening the destination or sending the surrounding message.",
       statusLabel: "Available now",
       statusValue: "Private browser checker",
       footer: "Pause. Check. Verify. Involve. Recover.",
       actionNote:
-        "Your checked content stays in this browser. Optional content-free analytics are off by default and never include the message, link, phone number, image, or QR code you check.",
+        "Messages, phone numbers, and images stay in your browser; only minimized web addresses use Google Web Risk lookups. Optional content-free analytics are off by default and never include checked content.",
     };

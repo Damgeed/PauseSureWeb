@@ -1,20 +1,72 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { analyzeCheck, analyzeLink, analyzePhone, analyzeText } from "../app/check/checker.ts";
+import {
+  analyzeCheck,
+  analyzeLink,
+  analyzePhone,
+  analyzeText,
+  normalizeLinkForReputation,
+  reputationIndicatorsForCheck,
+} from "../app/check/checker.ts";
 
 test("flags combined pressure, payment, and secrecy without declaring certainty", () => {
   const result = analyzeText("Act now. Buy gift cards and do not tell anyone. Send the codes immediately.");
   assert.equal(result.risk, "high");
+  assert.equal(result.label, "High risk");
   assert.ok(result.signals.some((item) => item.code === "payment"));
   assert.ok(result.signals.some((item) => item.code === "secrecy"));
   assert.match(result.limitation, /not proof/i);
 });
 
-test("treats absent signals as insufficient evidence rather than safe", () => {
+test("uses the approved unclear wording for a single warning signal", () => {
+  const result = analyzeText("This is urgent.");
+  assert.equal(result.risk, "unclear");
+  assert.equal(result.label, "Unclear");
+});
+
+test("uses the approved likely-safe wording without making a guarantee", () => {
   const result = analyzeText("Can we talk tomorrow afternoon?");
   assert.equal(result.risk, "insufficient");
-  assert.doesNotMatch(result.label, /^safe$/i);
-  assert.match(result.limitation, /cannot guarantee/i);
+  assert.equal(result.label, "Likely safe");
+  assert.equal(result.limitation, "Likely safe is not a guarantee.");
+});
+
+test("normalizes only complete web addresses for reputation lookup", () => {
+  assert.equal(normalizeLinkForReputation("pausesure.com/check"), "https://pausesure.com/check");
+  assert.equal(normalizeLinkForReputation("https://www.pausesure"), null);
+  assert.equal(normalizeLinkForReputation("mailto:help@pausesure.com"), null);
+});
+
+test("removes credentials, fragments, and the complete query string before transmission", () => {
+  assert.equal(
+    normalizeLinkForReputation(
+      "https://Alice:secret@Example.com/pay?campaign=summer&utm_source=notice&gclid=ad&access_token=s3cr3t&email=a%40b.com#private",
+    ),
+    "https://example.com/pay",
+  );
+  assert.equal(
+    normalizeLinkForReputation(
+      "https://example.com/path?ref=statement&_ga=analytics&mc_eid=contact&phone_number=12025550123&x-amz-signature=signed",
+    ),
+    "https://example.com/path",
+  );
+});
+
+test("extracts every bounded unique message URL without the surrounding message", () => {
+  const message = "Urgent story text https://example.com/pay?token=secret&utm_source=mail then pausesure.com/check?campaign=one and https://example.com/pay?token=different.";
+  assert.deepEqual(reputationIndicatorsForCheck("text", message), [
+    "https://example.com/pay",
+    "https://pausesure.com/check",
+  ]);
+  assert.deepEqual(reputationIndicatorsForCheck("screenshot", message), []);
+});
+
+test("bounds message reputation lookups to eight addresses", () => {
+  const message = Array.from({ length: 10 }, (_, index) => `https://example.com/path-${index}`).join(" ");
+  const indicators = reputationIndicatorsForCheck("text", message);
+  assert.equal(indicators.length, 8);
+  assert.equal(indicators[0], "https://example.com/path-0");
+  assert.equal(indicators[7], "https://example.com/path-7");
 });
 
 test("explains structurally suspicious link patterns", () => {
@@ -186,6 +238,17 @@ test("warns when a message exceeds the bounded link inspection limit", () => {
 
 test("does not claim a phone number proves identity", () => {
   const result = analyzePhone("+1 (202) 555-0123");
-  assert.equal(result.risk, "insufficient");
+  assert.equal(result.risk, "unclear");
+  assert.equal(result.label, "Couldn’t verify");
   assert.match(result.summary, /cannot prove/i);
+});
+
+test("uses exactly the four approved customer decision labels", () => {
+  const labels = [
+    analyzeText("Act now. Buy gift cards and do not tell anyone.").label,
+    analyzeText("This is urgent.").label,
+    analyzeText("Can we talk tomorrow?").label,
+    analyzePhone("+1 202 555 0123").label,
+  ];
+  assert.deepEqual(labels, ["High risk", "Unclear", "Likely safe", "Couldn’t verify"]);
 });

@@ -154,7 +154,7 @@ function resultFor(signals: WebCheckSignal[], context: string): WebCheckResult {
   if (risk === "high") {
     return {
       risk,
-      label: "Strong warning signals",
+      label: "High risk",
       summary: `Pause before acting. ${context} contains a combination commonly used to create pressure or hide identity.`,
       signals,
       nextSteps: [
@@ -169,7 +169,7 @@ function resultFor(signals: WebCheckSignal[], context: string): WebCheckResult {
   if (risk === "unclear") {
     return {
       risk,
-      label: "Verify before acting",
+      label: "Unclear",
       summary: `PauseSure found something worth checking in ${context}, but the available evidence is not enough for a definitive conclusion.`,
       signals,
       nextSteps: [
@@ -183,16 +183,67 @@ function resultFor(signals: WebCheckSignal[], context: string): WebCheckResult {
 
   return {
     risk,
-    label: "Not enough evidence",
-    summary: `No strong pattern was visible in ${context}. That does not establish that the sender, link, or request is legitimate.`,
+    label: "Likely safe",
+    summary: `No strong scam signals were found in ${context}.`,
     signals: [signal("limited_evidence", "Limited visible evidence", "Many scams look ordinary at first or depend on context outside this check.")],
     nextSteps: [
       "Verify unexpected requests through an official channel you find yourself.",
       "Never share a password, security code, or payment because someone is rushing you.",
       "Check again if the conversation changes or a payment request appears.",
     ],
-    limitation: "PauseSure cannot guarantee that something is safe.",
+    limitation: "Likely safe is not a guarantee.",
   };
+}
+
+export function normalizeLinkForReputation(value: string): string | null {
+  try {
+    const url = new URL(normalizeWebAddress(value));
+    if (!["http:", "https:"].includes(url.protocol) || !url.hostname) return null;
+
+    const hostname = inspectHostname(url.hostname);
+    if (!hostname.isNumeric && (!hostname.hasValidSyntax || !hostname.hasRecognizedTopLevelDomain)) {
+      return null;
+    }
+    url.username = "";
+    url.password = "";
+    url.hash = "";
+    url.search = "";
+    return url.toString();
+  } catch {
+    return null;
+  }
+}
+
+export function reputationIndicatorsForCheck(
+  kind: WebCheckKind,
+  value: string,
+): string[] {
+  if (kind === "link" || kind === "qr") {
+    const indicator = normalizeLinkForReputation(value);
+    return indicator ? [indicator] : [];
+  }
+  if (kind !== "text") return [];
+
+  const indicators: string[] = [];
+  const seen = new Set<string>();
+  let inspectedLinks = 0;
+  for (const tokenMatch of value.matchAll(boundedTextTokenPattern)) {
+    const linkValue = trimLinkToken(tokenMatch[1]);
+    if (
+      !linkValue
+      || linkValue.length > maximumLinkCharacters
+      || !shouldInspectTextLink(linkValue)
+    ) continue;
+    if (inspectedLinks >= maximumLinksPerMessage) break;
+    inspectedLinks += 1;
+
+    const indicator = normalizeLinkForReputation(linkValue);
+    if (indicator && !seen.has(indicator)) {
+      seen.add(indicator);
+      indicators.push(indicator);
+    }
+  }
+  return indicators;
 }
 
 export function analyzeText(value: string): WebCheckResult {
@@ -217,7 +268,7 @@ export function analyzeText(value: string): WebCheckResult {
     ) continue;
     if (inspectedLinks >= maximumLinksPerMessage) {
       if (!signals.some((existing) => existing.code === "many_links")) {
-        signals.push(signal("many_links", "Many destinations", "The message contains more links than this first check inspects individually. Verify every destination independently."));
+        signals.push(signal("many_links", "Many destinations", "The message contains more links than this check inspects individually. Verify every destination independently."));
       }
       break;
     }
@@ -279,13 +330,20 @@ export function analyzePhone(value: string): WebCheckResult {
     return resultFor([signal("invalid_phone", "Number format needs checking", "The number does not look like a complete national or international phone number.")], "this phone number");
   }
   return {
-    ...resultFor([], "this phone number"),
+    risk: "unclear",
+    label: "Couldn’t verify",
     summary: "A phone number alone cannot prove who is calling. Caller ID can be spoofed, including a number that appears familiar.",
+    signals: [signal(
+      "caller_identity_unverified",
+      "Caller identity not verified",
+      "PauseSure has not received a licensed caller-reputation result for this number.",
+    )],
     nextSteps: [
       "Do not call back using a number supplied in an unexpected message.",
       "Find the organization’s official number on its app, statement, card, or verified website.",
       "If the caller claimed to be someone you know, call that person using a number already saved in your contacts.",
     ],
+    limitation: "Couldn’t verify is not proof that the caller is safe or dangerous.",
   };
 }
 

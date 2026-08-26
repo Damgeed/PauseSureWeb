@@ -13,7 +13,7 @@ PauseSure helps people slow down, inspect suspicious requests, verify them indep
 ## Website routes
 
 - `/` — company homepage
-- `/check` — local-first public safety checker
+- `/check` — privacy-minimizing public safety checker with live URL intelligence
 - `/product` — product overview
 - `/how-it-works` — decision-support workflow
 - `/safety` — safety and privacy design
@@ -21,7 +21,7 @@ PauseSure helps people slow down, inspect suspicious requests, verify them indep
 - `/company` — mission, product status, and contact
 - `/privacy`, `/security`, `/terms`, `/support`, `/account-deletion` — public trust and support pages
 
-## Local development
+## Developer workflow
 
 Requires Node.js 22.13 or newer.
 
@@ -39,7 +39,7 @@ npm run verify
 
 `npm run verify` audits dependencies, lints, type-checks, builds and tests the
 deployable Worker, and validates the Wrangler deployment bundle without
-publishing it. Local development binds only to `127.0.0.1`; production requests
+publishing it. The development server binds only to `127.0.0.1`; production requests
 are restricted to the canonical HTTPS origin by the Worker.
 
 ## Deployment
