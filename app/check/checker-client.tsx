@@ -139,7 +139,7 @@ export default function CheckerClient() {
 
   const needsImage = kind === "screenshot" || kind === "qr";
   const placeholder = kind === "link"
-    ? "www.example.com or https://example.com/account/verify"
+    ? "pausesure.com or https://example.com/account/verify"
     : kind === "phone"
       ? "+1 202 555 0123"
       : needsImage
@@ -175,8 +175,9 @@ export default function CheckerClient() {
           </div>}
           {imageStatus && <p className="checker-image-status" role="status">{imageStatus}</p>}
           <label htmlFor="check-content">{selectedKind.label} details</label>
+          {kind === "link" && <p className="checker-field-help" id="link-format-help">No http://, https://, or www. is needed. Paste a complete address such as pausesure.com; an incomplete ending such as www.pausesure will be flagged.</p>}
           {kind === "link" || kind === "phone" ? (
-            <input id="check-content" value={value} onChange={(event) => setValue(event.target.value)} placeholder={placeholder} autoComplete="off" inputMode={kind === "phone" ? "tel" : "url"} />
+            <input id="check-content" value={value} onChange={(event) => setValue(event.target.value)} placeholder={placeholder} autoComplete="off" inputMode={kind === "phone" ? "tel" : "url"} aria-describedby={kind === "link" ? "link-format-help" : undefined} />
           ) : (
             <textarea id="check-content" value={value} onChange={(event) => setValue(event.target.value)} placeholder={placeholder} rows={7} />
           )}

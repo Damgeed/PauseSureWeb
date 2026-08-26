@@ -285,3 +285,11 @@ test("dismisses the mobile navigation without weakening keyboard access", async 
   assert.match(source, /onClick=\{\(\)\s*=>\s*closeMenu\(\)\}/, "menu links should close the menu after activation");
   assert.match(source, /removeEventListener\("pointerdown",\s*handlePointerDown\)/, "outside-click listeners should be cleaned up");
 });
+
+test("explains bare and incomplete link formats in the checker", async () => {
+  const source = await readFile(new URL("../app/check/checker-client.tsx", import.meta.url), "utf8");
+  assert.match(source, /pausesure\.com or https:\/\/example\.com\/account\/verify/);
+  assert.match(source, /No http:\/\/, https:\/\/, or www\. is needed/);
+  assert.match(source, /incomplete ending such as www\.pausesure will be flagged/);
+  assert.match(source, /aria-describedby=\{kind === "link" \? "link-format-help" : undefined\}/);
+});
