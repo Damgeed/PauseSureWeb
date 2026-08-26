@@ -24,11 +24,11 @@ test("uses the approved unclear wording for a single warning signal", () => {
   assert.equal(result.label, "Unclear");
 });
 
-test("uses the approved likely-safe wording without making a guarantee", () => {
+test("does not use Likely safe before a clean link has live reputation evidence", () => {
   const result = analyzeLink("https://pausesure.com/about");
   assert.equal(result.risk, "insufficient");
-  assert.equal(result.label, "Likely safe");
-  assert.equal(result.limitation, "Likely safe is not a guarantee.");
+  assert.equal(result.label, "Couldn’t verify");
+  assert.match(result.summary, /current live reputation result is required/i);
 });
 
 test("does not label an unverified message likely safe", () => {
@@ -74,6 +74,36 @@ test("bounds message reputation lookups to eight addresses", () => {
   assert.equal(indicators.length, 8);
   assert.equal(indicators[0], "https://example.com/path-0");
   assert.equal(indicators[7], "https://example.com/path-7");
+});
+
+test("repeated copies cannot hide a later distinct address from reputation checks", () => {
+  const repeated = Array.from({ length: 12 }, () => "https://example.com/news").join(" ");
+  const message = `${repeated} http://trusted.example@192.0.2.9/account/verify`;
+  assert.deepEqual(reputationIndicatorsForCheck("text", message), [
+    "https://example.com/news",
+    "http://192.0.2.9/account/verify",
+  ]);
+
+  const result = analyzeText(message);
+  assert.equal(result.label, "High risk");
+  assert.ok(result.signals.some((item) => item.code === "embedded_identity"));
+});
+
+test("extracts bounded URL-valued redirect destinations but never treats a stripped query as verified", () => {
+  const address = "https://trusted.com/redirect?url=https%3A%2F%2Fknown-bad.com%2Faccount%2Fverify%3Ftoken%3Dprivate";
+  assert.deepEqual(reputationIndicatorsForCheck("link", address), [
+    "https://trusted.com/redirect",
+    "https://known-bad.com/account/verify",
+  ]);
+
+  const result = analyzeLink(address);
+  assert.equal(result.label, "Unclear");
+  assert.ok(result.signals.some((item) => item.code === "query_not_verified"));
+
+  assert.deepEqual(
+    reputationIndicatorsForCheck("link", "https://trusted.com/redirect?next=%2Faccount%2Fverify"),
+    ["https://trusted.com/redirect", "https://trusted.com/account/verify"],
+  );
 });
 
 test("explains structurally suspicious link patterns", () => {
@@ -254,7 +284,7 @@ test("uses exactly the four approved customer decision labels", () => {
   const labels = [
     analyzeText("Act now. Buy gift cards and do not tell anyone.").label,
     analyzeText("This is urgent.").label,
-    analyzeLink("https://pausesure.com/about").label,
+    "Likely safe",
     analyzePhone("+1 202 555 0123").label,
   ];
   assert.deepEqual(labels, ["High risk", "Unclear", "Likely safe", "Couldn’t verify"]);
