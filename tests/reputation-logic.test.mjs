@@ -126,8 +126,8 @@ test("never lets provider absence or a no-match downgrade deterministic warnings
   assert.equal(combineReputationDecision(unclear, [noMatch, unavailable]).label, "Unclear");
 });
 
-test("uses Likely safe only when every URL lookup returns no known match", () => {
-  const rules = analyzeText("Please review https://example.com/news tomorrow.");
+test("uses Likely safe for a clean direct link only when its lookup returns no known match", () => {
+  const rules = analyzeLink("https://example.com/news");
   const parsed = parseReputationResponse(response(), submittedURL, now);
   assert.ok(parsed);
   const noMatch = providerEvidence(submittedURL, parsed);
@@ -138,6 +138,16 @@ test("uses Likely safe only when every URL lookup returns no known match", () =>
     combineReputationDecision(rules, [noMatch, transportFailureEvidence("https://pausesure.com/check", now)]).label,
     "Couldn’t verify",
   );
+});
+
+test("does not turn an unverified message into Likely safe after URL no-match", () => {
+  const rules = analyzeText("Please review https://example.com/news tomorrow.");
+  const parsed = parseReputationResponse(response(), submittedURL, now);
+  assert.ok(parsed);
+  const noMatch = providerEvidence(submittedURL, parsed);
+
+  assert.equal(rules.label, "Couldn’t verify");
+  assert.equal(combineReputationDecision(rules, [noMatch]).label, "Couldn’t verify");
 });
 
 test("escalates the complete decision when any checked URL has a malicious match", () => {
