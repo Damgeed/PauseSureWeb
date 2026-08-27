@@ -42,6 +42,7 @@ test("renders the public multi-page company site", async () => {
     assert.doesNotMatch(html, /mailto:/i, `${route} should not advertise an unverified email route`);
     assert.doesNotMatch(html, /\/(?:_next|_vinext)\/image\?/i, `${route} should use deploy-safe image URLs`);
     assert.doesNotMatch(html, /(?:in active development|still in development|pre-release|coming to iPhone|product in development|development-stage|private development|not yet listed|will appear when|when it becomes available|authorized testers|when available)/i, `${route} should use deliberate ready-state language`);
+    assert.doesNotMatch(html, /(?:\blocal\b|\bunavailable\b|on[- ]device|in (?:this|your) browser|private browser|live URL intelligence|coming soon|coming up)/i, `${route} should not restore removed interface wording`);
     const canonicalUrl = `https://pausesure.com${route === "/" ? "" : route}`;
     assert.ok(html.includes(`<link rel="canonical" href="${canonicalUrl}"/>`), `${route} should have a self-referencing canonical URL`);
     assert.ok(html.includes(`<meta property="og:url" content="${canonicalUrl}"/>`), `${route} should have a route-specific Open Graph URL`);
@@ -75,6 +76,12 @@ test("renders the public multi-page company site", async () => {
   const missing = await worker.fetch(new Request("http://localhost/not-a-pause-sure-page", { headers: { accept: "text/html" } }), env, ctx);
   assert.equal(missing.status, 404, "unknown routes should return a real 404");
   assert.match(await missing.text(), /This link does not lead to a PauseSure page/i);
+});
+
+test("uses only the canonical production analysis route for checker decisions", async () => {
+  const source = await readFile(new URL("../app/check/checker-client.tsx", import.meta.url), "utf8");
+  assert.match(source, /\/v1\/analysis\/check/);
+  assert.doesNotMatch(source, /analyzeCheck|combineReputationDecision|\/v1\/reputation\/check/);
 });
 
 test("permits browser reputation requests only to the production gateway", async () => {
