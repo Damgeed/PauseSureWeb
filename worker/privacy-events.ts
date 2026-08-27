@@ -81,6 +81,53 @@ function isExactJsonMediaType(value: string | null) {
   return /^application\/json(?:\s*;\s*charset\s*=\s*(?:utf-8|"utf-8"))?$/i.test(value?.trim() ?? "");
 }
 
+function canonicalIPv4(value: string): string | null {
+  if (!/^\d{1,3}(?:\.\d{1,3}){3}$/u.test(value)) return null;
+  const octets = value.split(".").map(Number);
+  if (octets.some((octet) => !Number.isInteger(octet) || octet < 0 || octet > 255)) return null;
+  const canonical = octets.join(".");
+  return canonical === value ? canonical : null;
+}
+
+function expandedIPv6(value: string): number[] | null {
+  const pieces = value.split("::");
+  if (pieces.length > 2) return null;
+  const left = pieces[0] ? pieces[0].split(":") : [];
+  const right = pieces.length === 2 && pieces[1] ? pieces[1].split(":") : [];
+  const missing = 8 - left.length - right.length;
+  if ((pieces.length === 1 && missing !== 0) || (pieces.length === 2 && missing < 1)) return null;
+  const groups = [
+    ...left,
+    ...Array.from({ length: pieces.length === 2 ? missing : 0 }, () => "0"),
+    ...right,
+  ];
+  if (groups.length !== 8 || groups.some((group) => !/^[a-f\d]{1,4}$/u.test(group))) return null;
+  return groups.map((group) => Number.parseInt(group, 16));
+}
+
+function analyticsRateLimitKey(value: string): string | null {
+  const ipv4 = canonicalIPv4(value);
+  if (ipv4) return `v4:${ipv4}`;
+  if (!value.includes(":") || !/^[a-f\d:.]+$/iu.test(value)) return null;
+  try {
+    const hostname = new URL(`https://[${value}]/`).hostname;
+    const canonical = hostname.slice(1, -1);
+    const groups = expandedIPv6(canonical);
+    if (!groups) return null;
+    if (
+      groups.slice(0, 5).every((group) => group === 0)
+      && groups[5] === 0xffff
+    ) {
+      const high = groups[6] ?? 0;
+      const low = groups[7] ?? 0;
+      return `v4:${high >> 8}.${high & 0xff}.${low >> 8}.${low & 0xff}`;
+    }
+    return `v6:${groups.slice(0, 4).map((group) => group.toString(16).padStart(4, "0")).join(":")}/64`;
+  } catch {
+    return null;
+  }
+}
+
 async function readBoundedUtf8Body(request: Request): Promise<BodyReadResult> {
   if (!request.body) return { ok: true, value: "" };
 
@@ -122,8 +169,8 @@ function retentionCutoff(now: Date) {
 }
 
 export async function deleteExpiredPrivacyEvents(env: PrivacyEventEnv, now = new Date()) {
-  if (!env.DB) throw new Error("Analytics storage unavailable for retention cleanup.");
-  await env.DB.prepare("DELETE FROM privacy_event_daily WHERE day < ?").bind(retentionCutoff(now)).run();
+  if (!env.DB) throw new Error("Analytics retention cleanup could not be completed.");
+  await env.DB.prepare("DELETE FROM privacy_event_daily WHERE day <= ?").bind(retentionCutoff(now)).run();
 }
 
 export async function handlePrivacyEvents(request: Request, env: PrivacyEventEnv): Promise<Response> {
@@ -145,15 +192,17 @@ export async function handlePrivacyEvents(request: Request, env: PrivacyEventEnv
 
   const clientAddress = request.headers.get("cf-connecting-ip");
   if (!env.ANALYTICS_RATE_LIMITER || !clientAddress) {
-    return jsonError("Analytics protection unavailable.", 503);
+    return jsonError("Analytics request could not be completed.", 503);
   }
+  const clientRateLimitKey = analyticsRateLimitKey(clientAddress);
+  if (!clientRateLimitKey) return jsonError("Analytics request could not be completed.", 503);
   // The edge limiter uses this request-scoped key only for abuse control. It is
   // never included in the D1 statements, analytics dimensions, or application logs.
   let rateLimit: { success: boolean };
   try {
-    rateLimit = await env.ANALYTICS_RATE_LIMITER.limit({ key: `privacy-events:${clientAddress}` });
+    rateLimit = await env.ANALYTICS_RATE_LIMITER.limit({ key: `privacy-events:${clientRateLimitKey}` });
   } catch {
-    return jsonError("Analytics protection unavailable.", 503);
+    return jsonError("Analytics request could not be completed.", 503);
   }
   if (!rateLimit.success) {
     return jsonError("Too many analytics requests.", 429, { "retry-after": "60" });
@@ -180,7 +229,7 @@ export async function handlePrivacyEvents(request: Request, env: PrivacyEventEnv
   if (events.some((event) => event === null)) {
     return jsonError("Event contains unsupported or identifying fields.", 400);
   }
-  if (!env.DB) return jsonError("Analytics storage unavailable.", 503);
+  if (!env.DB) return jsonError("Analytics request could not be completed.", 503);
 
   const statements: D1PreparedStatement[] = [];
   for (const event of events as EventBody[]) {

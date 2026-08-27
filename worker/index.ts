@@ -8,27 +8,26 @@ interface Env extends PrivacyEventEnv {
   ASSETS: Fetcher;
 }
 
-const contentSecurityPolicy = [
-  "default-src 'self'",
-  "base-uri 'none'",
-  "connect-src 'self' https://pausesure-production.up.railway.app",
-  "font-src 'self'",
-  "form-action 'self'",
-  "frame-ancestors 'none'",
-  "img-src 'self' data: blob:",
-  "media-src 'self'",
-  "object-src 'none'",
-  // Vinext/React currently emits inline bootstrap script elements. Inline
-  // attributes and styles remain prohibited.
-  "script-src 'self' 'unsafe-inline'",
-  "script-src-attr 'none'",
-  "style-src 'self'",
-  "style-src-attr 'none'",
-  "upgrade-insecure-requests",
-].join("; ");
+function contentSecurityPolicy(nonce: string): string {
+  return [
+    "default-src 'self'",
+    "base-uri 'none'",
+    "connect-src 'self' https://pausesure-production.up.railway.app",
+    "font-src 'self'",
+    "form-action 'self'",
+    "frame-ancestors 'none'",
+    "img-src 'self' data: blob:",
+    "media-src 'self'",
+    "object-src 'none'",
+    `script-src 'nonce-${nonce}' 'strict-dynamic'`,
+    "script-src-attr 'none'",
+    "style-src 'self'",
+    "style-src-attr 'none'",
+    "upgrade-insecure-requests",
+  ].join("; ");
+}
 
 const securityHeaders = {
-  "Content-Security-Policy": contentSecurityPolicy,
   "Cross-Origin-Opener-Policy": "same-origin",
   "Permissions-Policy": "camera=(), geolocation=(), microphone=(), payment=(), usb=()",
   "Referrer-Policy": "strict-origin-when-cross-origin",
@@ -37,8 +36,24 @@ const securityHeaders = {
   "X-Frame-Options": "DENY",
 } as const;
 
-function withSecurityHeaders(response: Response): Response {
+function createNonce(): string {
+  const nonceBytes = crypto.getRandomValues(new Uint8Array(18));
+  return btoa(String.fromCharCode(...nonceBytes));
+}
+
+function withNoncePolicy(request: Request, nonce: string): Request {
+  const headers = new Headers(request.headers);
+  // Vinext reads the request policy and applies the nonce only to framework-owned
+  // bootstrap scripts while rendering. Never bless arbitrary response script tags.
+  headers.set("Content-Security-Policy", contentSecurityPolicy(nonce));
+  return new Request(request, { headers });
+}
+
+export async function withSecurityHeaders(response: Response, nonce: string): Promise<Response> {
+  const contentType = response.headers.get("content-type") ?? "";
   const headers = new Headers(response.headers);
+  headers.set("Content-Security-Policy", contentSecurityPolicy(nonce));
+  if (/^text\/html\b/i.test(contentType)) headers.set("Cache-Control", "private, no-store");
   for (const [name, value] of Object.entries(securityHeaders)) {
     headers.set(name, value);
   }
@@ -64,26 +79,42 @@ function canonicalRedirect(url: URL) {
 
 const worker = {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
+    const nonce = createNonce();
     const url = new URL(request.url);
     const hostname = url.hostname.toLowerCase();
     const isDevelopment = isDevelopmentHost(hostname);
 
     if (!isDevelopment && (url.protocol !== "https:" || hostname === "www.pausesure.com")) {
-      return withSecurityHeaders(canonicalRedirect(url));
+      return withSecurityHeaders(canonicalRedirect(url), nonce);
     }
     if (!isDevelopment && url.origin !== canonicalOrigin) {
-      return withSecurityHeaders(new Response("Misdirected Request", { status: 421 }));
+      return withSecurityHeaders(new Response("Misdirected Request", { status: 421 }), nonce);
     }
 
-    if (url.pathname === "/api/privacy-events") {
-      return withSecurityHeaders(await handlePrivacyEvents(request, env));
-    }
+    try {
+      if (url.pathname === "/api/privacy-events") {
+        return withSecurityHeaders(await handlePrivacyEvents(request, env), nonce);
+      }
 
-    if (url.pathname === "/_vinext/image" || url.pathname === "/_next/image") {
-      return withSecurityHeaders(new Response("Not Found", { status: 404 }));
-    }
+      if (url.pathname === "/_vinext/image" || url.pathname === "/_next/image") {
+        return withSecurityHeaders(new Response("Not Found", { status: 404 }), nonce);
+      }
 
-    return withSecurityHeaders(await handler.fetch(request, env, ctx));
+      return withSecurityHeaders(await handler.fetch(withNoncePolicy(request, nonce), env, ctx), nonce);
+    } catch {
+      // Never log request content, provider errors, addresses, or analytics values.
+      console.error("[PauseSure] Request handling failed.");
+      return withSecurityHeaders(new Response(
+        JSON.stringify({ error: "Request could not be completed." }),
+        {
+          status: 503,
+          headers: {
+            "cache-control": "no-store",
+            "content-type": "application/json; charset=utf-8",
+          },
+        },
+      ), nonce);
+    }
   },
 
   scheduled(_controller: ScheduledController, env: Env, ctx: ExecutionContext) {

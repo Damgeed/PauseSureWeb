@@ -21,7 +21,7 @@ export default function SafetyPage() {
     <section className="section page-section" id="protection-tools">
       <div className="section-heading"><p className="section-kicker">Protection tools</p><h2>Investigate, involve, and recover.</h2><p>These are user-started tools, separate from the setup check. Each one has a defined purpose and a visible boundary.</p></div>
       <div className="commitment-grid">
-        <article><span>01</span><h3>URL threat intelligence</h3><p>Checks a minimized address against Google Web Risk and keeps provider credentials on PauseSure servers. A no-known-match response never overrides stronger warning signals.</p></article>
+        <article><span>01</span><h3>URL threat intelligence</h3><p>Checks a bounded address against Google Web Risk and keeps provider credentials on PauseSure servers. It does not open the submitted site or treat its current response status, deactivation, or later return as proof of safety. A no-known-match response never overrides stronger warning signals.</p></article>
         <article><span>02</span><h3>Scam Pulse</h3><p>Shows manually reviewed entries that link directly to official government sources. It is not exhaustive or real-time, and a failed feed check never means a threat is absent. <a href="/scam-pulse/v1.json">View the source-backed feed.</a></p></article>
         <article><span>03</span><h3>After-call review</h3><p>Imports only the voicemail or recording you select. PauseSure does not record cellular calls or analyze live call audio.</p></article>
         <article><span>04</span><h3>Trusted Circle</h3><p>Sends a request only after you choose the recipient and confirm what to share. Connected request content is encrypted before it leaves the device.</p></article>

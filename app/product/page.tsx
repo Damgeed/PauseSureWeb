@@ -10,7 +10,7 @@ export const metadata = pageMetadata({
 
 const inputs = [
   ["Message", "Paste a text or email, review pressure, impersonation, payment, and secrecy signals, and check each bounded web address without sending the surrounding message."],
-  ["Link", "Inspect the address structure, check the minimized address against Google Web Risk, and verify high-impact requests through an official channel you find independently."],
+  ["Link", "Inspect the address structure, check the bounded address against Google Web Risk, and verify high-impact requests through an official channel you find independently."],
   ["Screenshot", "Select a screenshot for private preview, then paste the visible wording into the same explainable review."],
   ["QR code", "Read a code before following it, then separate the destination from the story around it."],
   ["Audio or voicemail", "Import a supported file you select and review its transcript in the same calm workflow. PauseSure does not record live cellular calls."],
