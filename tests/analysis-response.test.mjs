@@ -36,6 +36,7 @@ test("rejects mismatched kinds, unsafe labels, and oversized response content", 
 });
 
 test("rejects malformed destination evidence", () => {
+  const now = new Date("2026-08-27T08:05:00.000Z");
   const reputation = [{
     schemaVersion: 1,
     kind: "url",
@@ -50,8 +51,28 @@ test("rejects malformed destination evidence", () => {
     disclaimer: "A missing match is not a guarantee.",
     indicator: { host: "example.com" },
   }];
-  assert.ok(parseAnalysisResponse(payload({ reputation }), "text"));
-  assert.equal(parseAnalysisResponse(payload({ reputation: [{ ...reputation[0], indicator: { host: "" } }] }), "text"), null);
+  assert.ok(parseAnalysisResponse(payload({ reputation }), "text", now));
+  for (const candidate of [
+    { ...reputation[0], indicator: { host: "" } },
+    { ...reputation[0], source: { id: "substituted", name: "Google Web Risk" } },
+    { ...reputation[0], availability: "unavailable" },
+    { ...reputation[0], threatTypes: ["PHISHING"] },
+    { ...reputation[0], threatTypes: ["MALWARE"] },
+    { ...reputation[0], expiresAt: "2026-08-27T08:04:00.000Z" },
+  ]) {
+    assert.equal(parseAnalysisResponse(payload({ reputation: [candidate] }), "text", now), null);
+  }
+
+  const malicious = {
+    ...reputation[0],
+    resultType: "malicious",
+    threatTypes: ["SOCIAL_ENGINEERING"],
+  };
+  assert.ok(parseAnalysisResponse(payload({ reputation: [malicious] }), "text", now));
+  assert.equal(
+    parseAnalysisResponse(payload({ reputation: [{ ...malicious, threatTypes: [] }] }), "text", now),
+    null,
+  );
 });
 
 test("ignores stale asynchronous check results", () => {
