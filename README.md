@@ -13,7 +13,7 @@ PauseSure helps people slow down, inspect suspicious requests, verify them indep
 ## Website routes
 
 - `/` — company homepage
-- `/check` — privacy-minimizing public safety checker with live URL intelligence
+- `/check` — public safety checker backed by the production analysis service
 - `/product` — product overview
 - `/how-it-works` — decision-support workflow
 - `/safety` — safety and privacy design
@@ -60,7 +60,7 @@ Do not add analytics, advertising pixels, form collection, authentication, or th
 
 ## Release state
 
-`app/release.ts` is the single source of truth for the site-wide primary action and ready-state messaging. The `web` state always leads to the usable first-party browser checker. Switch the state to `app-store` only after a verified `https://apps.apple.com/` listing resolves and the release, privacy, security, support, and account-deletion reviews are complete. Never replace the web action with an unavailable download control.
+`app/release.ts` is the single source of truth for the site-wide primary action and ready-state messaging. The `web` state always leads to the usable first-party web checker. Switch the state to `app-store` only after a verified `https://apps.apple.com/` listing resolves and the release, privacy, security, support, and account-deletion reviews are complete.
 
 The reviewed Scam Pulse feed is published at `public/scam-pulse/v1.json`. Every campaign entry must link directly to an HTTPS government source, preserve that source's publication date, and pass the feed contract tests. A missing or stale source is uncertainty, never proof that a threat is absent.
 

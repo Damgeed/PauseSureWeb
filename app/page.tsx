@@ -198,7 +198,7 @@ export default function Home() {
             <details open><summary>Can PauseSure guarantee that something is safe?<span>+</span></summary><p>No. No tool can reliably guarantee that a person, message, link, or transaction is safe. PauseSure is decision support: it surfaces warning signals and helps you verify independently.</p></details>
             <details><summary>Does PauseSure replace my bank, police, or emergency services?<span>+</span></summary><p>No. If money has moved, an account may be compromised, or anyone is in immediate danger, contact the relevant bank, platform, police, or emergency service directly using an official channel.</p></details>
             <details><summary>Will my checks be used for advertising or sold?<span>+</span></summary><p>No. PauseSure does not use checks for behavioral advertising, cross-app tracking, or selling personal data. The current Privacy Notice explains the website and app data paths.</p></details>
-            <details><summary>Where can I use PauseSure?<span>+</span></summary><p>Use the private browser checker on pausesure.com now. The Product page also explains the iPhone app workflows and protection tools.</p></details>
+            <details><summary>Where can I use PauseSure?<span>+</span></summary><p>Use the PauseSure web checker on pausesure.com now. The Product page also explains the iPhone app workflows and protection tools.</p></details>
           </div>
         </section>
 

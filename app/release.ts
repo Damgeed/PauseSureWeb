@@ -8,8 +8,7 @@ type ReleaseConfig = {
 
 // PauseSure always has a usable first-party route. After Apple approves the
 // public listing, set stage to "app-store" and paste the verified
-// apps.apple.com URL. Until then, public actions lead to the browser checker
-// instead of presenting an unavailable download control.
+// apps.apple.com URL. Until then, public actions lead to the web checker.
 export const releaseConfig: ReleaseConfig = {
   stage: "web",
   platform: "iPhone",
@@ -54,12 +53,12 @@ export const releaseMessaging = hasVerifiedAppStoreListing
       eyebrow: "Use PauseSure now",
       headline: "A calmer way to handle suspicious requests.",
       summary:
-        "Check a message, link, phone number, screenshot, or QR code and get explainable warning signals, live URL intelligence, and practical next steps.",
+        "Check a message, link, phone number, screenshot, or QR code and get explainable warning signals, configured destination intelligence, and practical next steps.",
       availability:
-        "The PauseSure browser checker is available on pausesure.com. It analyzes messages and images in the browser and sends only minimized web addresses through PauseSure to Google Web Risk without opening the destination or sending the surrounding message.",
+        "The PauseSure web checker is ready on pausesure.com. Its production engine reviews submitted evidence and can check web addresses through configured Google Web Risk intelligence without opening the destination.",
       statusLabel: "Available now",
-      statusValue: "Private browser checker",
+      statusValue: "PauseSure web checker",
       footer: "Pause. Check. Verify. Involve. Recover.",
       actionNote:
-        "Messages, phone numbers, and images stay in your browser; only minimized web addresses use Google Web Risk lookups. Optional content-free analytics are off by default and never include checked content.",
+        "Submitted checks are not retained in application data or request logs. Optional content-free analytics are off by default and never include checked content.",
     };

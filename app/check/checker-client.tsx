@@ -2,25 +2,19 @@
 
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import {
-  analyzeCheck,
-  reputationIndicatorsForCheck,
+  parseAnalysisResponse,
+  LatestCheckSequence,
+  type ReputationResult,
   type WebCheckKind,
   type WebCheckResult,
-} from "./checker";
-import {
-  combineReputationDecision,
-  evidenceFromGatewayPayload,
-  LatestCheckSequence,
-  transportFailureEvidence,
-  type ReputationEvidence,
-} from "./reputation";
+} from "./analysis-response";
 
 const kinds: Array<{ id: WebCheckKind; label: string; description: string }> = [
   { id: "text", label: "Message", description: "Text, email or social message" },
   { id: "link", label: "Link", description: "Website or payment page" },
   { id: "phone", label: "Phone", description: "Unknown or claimed organization" },
-  { id: "screenshot", label: "Screenshot", description: "Image stays in this browser" },
-  { id: "qr", label: "QR code", description: "Decode in your browser" },
+  { id: "screenshot", label: "Screenshot", description: "Saved image or message capture" },
+  { id: "qr", label: "QR code", description: "Decode and inspect the destination" },
 ];
 
 const analyticsPreferenceKey = "pausesure_content_free_analytics";
@@ -28,7 +22,7 @@ const allowedImageTypes = new Set(["image/avif", "image/jpeg", "image/png", "ima
 const maximumImageBytes = 12 * 1024 * 1024;
 const maximumImageDimension = 8_192;
 const maximumImagePixels = 25_000_000;
-const reputationEndpoint = "https://pausesure-production.up.railway.app/v1/reputation/check";
+const analysisEndpoint = "https://pausesure-production.up.railway.app/v1/analysis/check";
 
 type AnalyticsDimensions = Partial<Record<"input" | "risk" | "action" | "channel", string>>;
 
@@ -52,26 +46,27 @@ function track(name: string, dimensions: AnalyticsDimensions, enabled: boolean) 
   }).catch(() => undefined);
 }
 
-async function checkUrlReputation(
-  submittedURL: string,
+async function requestAnalysis(
+  kind: WebCheckKind,
+  value: string,
   controller: AbortController,
-): Promise<ReputationEvidence> {
-  const timeout = window.setTimeout(() => controller.abort(), 10_000);
+): Promise<WebCheckResult | null> {
+  const timeout = window.setTimeout(() => controller.abort(), 15_000);
   try {
-    const response = await fetch(reputationEndpoint, {
+    const response = await fetch(analysisEndpoint, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ kind: "url", value: submittedURL }),
+      body: JSON.stringify({ kind, value }),
       cache: "no-store",
       credentials: "omit",
       referrerPolicy: "no-referrer",
       signal: controller.signal,
     });
-    if (!response.ok) return transportFailureEvidence(submittedURL);
+    if (!response.ok) return null;
     const payload: unknown = await response.json();
-    return evidenceFromGatewayPayload(payload, submittedURL);
+    return parseAnalysisResponse(payload, kind);
   } catch {
-    return transportFailureEvidence(submittedURL);
+    return null;
   } finally {
     window.clearTimeout(timeout);
   }
@@ -82,61 +77,38 @@ function formatLookupTime(value: string): string {
   return Number.isNaN(date.getTime()) ? "Unknown" : date.toLocaleString();
 }
 
-function formatIndicator(value: string): string {
-  try {
-    const url = new URL(value);
-    const path = url.pathname === "/" ? "" : url.pathname;
-    const label = `${url.hostname}${path}`;
-    return label.length > 120 ? `${label.slice(0, 117)}…` : label;
-  } catch {
-    return "Checked address";
-  }
-}
-
 function ReputationEvidenceCard({
   evidence,
   index,
   total,
 }: {
-  evidence: ReputationEvidence;
+  evidence: ReputationResult;
   index: number;
   total: number;
 }) {
   const headingID = `reputation-evidence-${index}`;
-  const checkedAddress = formatIndicator(evidence.submittedURL);
-  if (evidence.kind === "transport_failure") {
-    return <section className="reputation-evidence reputation-couldnt_verify" aria-labelledby={headingID}>
-      <h3 id={headingID}>Live URL intelligence · Address {index + 1} of {total}</h3>
-      <strong>Couldn’t verify</strong>
-      <p>The PauseSure reputation gateway did not return a usable response. No Google Web Risk result was received.</p>
-      <small>Checked address: {checkedAddress} · Gateway request attempted <time dateTime={evidence.attemptedAt}>{formatLookupTime(evidence.attemptedAt)}</time></small>
-      <p className="reputation-disclaimer">{evidence.disclaimer}</p>
-    </section>;
-  }
-
-  const response = evidence.response;
-  const title = response.resultType === "malicious"
+  const title = evidence.resultType === "malicious"
     ? "Known threat match"
-    : response.resultType === "no_known_match"
+    : evidence.resultType === "no_known_match"
       ? "No known threat match"
       : "Couldn’t verify";
-  const detail = response.resultType === "malicious"
-    ? `${response.source.name} identified this address on: ${response.threatTypes.map((type) => type.toLowerCase().replaceAll("_", " ")).join(", ")}.`
-    : response.resultType === "no_known_match"
-      ? `${response.source.name} did not find the minimized address on the selected threat lists.`
-      : "The PauseSure gateway did not obtain a usable provider result. Try again before using this address.";
-  const lookupLabel = response.resultType === "couldnt_verify"
-    ? response.cached ? "Cached unavailable result" : "Provider unavailable"
-    : response.cached ? "Cached provider result" : "Provider lookup";
+  const detail = evidence.resultType === "malicious"
+    ? `${evidence.source.name} identified this address on: ${evidence.threatTypes.map((type) => type.toLowerCase().replaceAll("_", " ")).join(", ")}.`
+    : evidence.resultType === "no_known_match"
+      ? `${evidence.source.name} did not find the checked address on the selected threat lists.`
+      : "The threat-list check did not return a usable result. Try again before using this address.";
+  const lookupLabel = evidence.resultType === "couldnt_verify"
+    ? "Check not completed"
+    : evidence.cached ? "Recent check result" : "Threat-list check";
 
-  return <section className={`reputation-evidence reputation-${response.resultType}`} aria-labelledby={headingID}>
-    <h3 id={headingID}>Live URL intelligence · Address {index + 1} of {total}</h3>
+  return <section className={`reputation-evidence reputation-${evidence.resultType}`} aria-labelledby={headingID}>
+    <h3 id={headingID}>Destination evidence · Address {index + 1} of {total}</h3>
     <strong>{title}</strong>
     <p>{detail}</p>
     <small>
-      Checked address: {checkedAddress} · Source: {response.source.name} · {lookupLabel} · Checked <time dateTime={response.checkedAt}>{formatLookupTime(response.checkedAt)}</time> · Current until <time dateTime={response.expiresAt}>{formatLookupTime(response.expiresAt)}</time>{typeof response.lookupDurationMs === "number" ? ` · ${response.lookupDurationMs} ms` : ""}
+      Checked host: {evidence.indicator.host} · Source: {evidence.source.name} · {lookupLabel} · Checked <time dateTime={evidence.checkedAt}>{formatLookupTime(evidence.checkedAt)}</time> · Current until <time dateTime={evidence.expiresAt}>{formatLookupTime(evidence.expiresAt)}</time> · {evidence.lookupDurationMs} ms
     </small>
-    <p className="reputation-disclaimer">{response.disclaimer}</p>
+    <p className="reputation-disclaimer">{evidence.disclaimer}</p>
   </section>;
 }
 
@@ -144,13 +116,13 @@ export default function CheckerClient() {
   const [kind, setKind] = useState<WebCheckKind>("text");
   const [value, setValue] = useState("");
   const [result, setResult] = useState<WebCheckResult | null>(null);
-  const [reputationEvidence, setReputationEvidence] = useState<ReputationEvidence[]>([]);
+  const [checkError, setCheckError] = useState<string | null>(null);
   const [isChecking, setIsChecking] = useState(false);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [imageStatus, setImageStatus] = useState<string | null>(null);
   const [analyticsEnabled, setAnalyticsEnabled] = useState(false);
   const [checkSequence] = useState(() => new LatestCheckSequence());
-  const activeLookupController = useRef<AbortController | null>(null);
+  const activeCheckController = useRef<AbortController | null>(null);
   const selectedKind = useMemo(() => kinds.find((item) => item.id === kind) ?? kinds[0], [kind]);
 
   useEffect(() => {
@@ -165,13 +137,13 @@ export default function CheckerClient() {
   }, [imageUrl]);
 
   useEffect(() => () => {
-    activeLookupController.current?.abort();
+    activeCheckController.current?.abort();
   }, []);
 
   function invalidatePendingCheck() {
     checkSequence.invalidate();
-    activeLookupController.current?.abort();
-    activeLookupController.current = null;
+    activeCheckController.current?.abort();
+    activeCheckController.current = null;
     setIsChecking(false);
   }
 
@@ -179,14 +151,14 @@ export default function CheckerClient() {
     invalidatePendingCheck();
     setValue(next);
     setResult(null);
-    setReputationEvidence([]);
+    setCheckError(null);
   }
 
   function clearCheck() {
     invalidatePendingCheck();
     setValue("");
     setResult(null);
-    setReputationEvidence([]);
+    setCheckError(null);
   }
 
   function chooseKind(next: WebCheckKind) {
@@ -195,7 +167,7 @@ export default function CheckerClient() {
     setKind(next);
     setValue("");
     setResult(null);
-    setReputationEvidence([]);
+    setCheckError(null);
     setImageStatus(null);
     if (imageUrl) URL.revokeObjectURL(imageUrl);
     setImageUrl(null);
@@ -225,32 +197,27 @@ export default function CheckerClient() {
     const inputKind = kind;
     const inputValue = value;
     const requestSequence = checkSequence.begin();
-    const indicators = reputationIndicatorsForCheck(inputKind, inputValue);
-    activeLookupController.current?.abort();
-    const controller = indicators.length > 0
-      ? new AbortController()
-      : null;
-    activeLookupController.current = controller;
+    activeCheckController.current?.abort();
+    const controller = new AbortController();
+    activeCheckController.current = controller;
 
     track("web_check_started", { input: inputKind }, analyticsEnabled);
     setIsChecking(true);
     setResult(null);
-    setReputationEvidence([]);
+    setCheckError(null);
     try {
-      const rulesResult = analyzeCheck(inputKind, inputValue);
-      const liveEvidence = controller
-        ? await Promise.all(indicators.map((indicator) => checkUrlReputation(indicator, controller)))
-        : [];
+      const next = await requestAnalysis(inputKind, inputValue, controller);
       if (!checkSequence.isCurrent(requestSequence)) return;
-
-      const next = combineReputationDecision(rulesResult, liveEvidence);
-      setReputationEvidence(liveEvidence);
+      if (!next) {
+        setCheckError("PauseSure couldn’t complete this check. Please try again.");
+        return;
+      }
       setResult(next);
       track("web_check_completed", { input: inputKind, risk: next.risk }, analyticsEnabled);
       track("result_viewed", { input: inputKind, risk: next.risk }, analyticsEnabled);
     } finally {
       if (checkSequence.isCurrent(requestSequence)) {
-        activeLookupController.current = null;
+        activeCheckController.current = null;
         setIsChecking(false);
       }
     }
@@ -259,7 +226,7 @@ export default function CheckerClient() {
   async function inspectImage(file: File | undefined) {
     invalidatePendingCheck();
     setResult(null);
-    setReputationEvidence([]);
+    setCheckError(null);
     setValue("");
     setImageStatus(null);
     if (imageUrl) URL.revokeObjectURL(imageUrl);
@@ -289,25 +256,25 @@ export default function CheckerClient() {
 
       setImageUrl(URL.createObjectURL(file));
       previewReady = true;
-      setImageStatus("The image remains on this device. Paste the visible wording below for a message check.");
+      setImageStatus("Image ready. Paste the visible wording below for a message check.");
       if (kind !== "qr") return;
 
       const Detector = (globalThis as unknown as { BarcodeDetector?: new (options: { formats: string[] }) => { detect(source: ImageBitmap): Promise<Array<{ rawValue: string }>> } }).BarcodeDetector;
       if (!Detector) {
-        setImageStatus("This browser cannot decode QR codes. Use the PauseSure iPhone QR scanner or paste the destination shown by your camera.");
+        setImageStatus("QR decoding did not start. Paste the destination shown by your camera.");
         return;
       }
       const matches = await new Detector({ formats: ["qr_code"] }).detect(bitmap);
       if (!matches[0]?.rawValue) {
-        setImageStatus("No QR destination was found. Try a sharper image or use the PauseSure iPhone QR scanner.");
+        setImageStatus("No QR destination was found. Try a sharper image or paste the destination.");
         return;
       }
       setValue(matches[0].rawValue);
-      setImageStatus("QR content decoded on this device. Review the destination before checking it.");
+      setImageStatus("QR content decoded. Review the destination before checking it.");
     } catch {
       if (!previewReady) setImageUrl(null);
       setImageStatus(kind === "qr"
-        ? "The QR code could not be decoded in this browser. Use the PauseSure iPhone QR scanner or paste the destination."
+        ? "The QR code could not be decoded. Paste the destination instead."
         : "The image could not be read safely. Try a different PNG, JPEG, WebP, or AVIF file.");
     } finally {
       bitmap?.close();
@@ -332,9 +299,9 @@ export default function CheckerClient() {
     <div className="checker-layout">
       <section className="checker-card" aria-labelledby="checker-title">
         <div className="checker-card-heading">
-          <p className="section-kicker">Private check</p>
+          <p className="section-kicker">PauseSure check</p>
           <h1 id="checker-title">What would you like to check?</h1>
-          <p>Messages, numbers, and images are analyzed in this browser. Minimized web addresses submitted directly, found in messages, or decoded from QR images are checked through PauseSure with Google Web Risk. The surrounding message is never sent for a URL lookup.</p>
+          <p>PauseSure reviews the evidence you submit for pressure, impersonation, payment, credential, destination, and other fraud signals, then returns clear reasons and safer next steps.</p>
         </div>
 
         <div className="checker-tabs" role="tablist" aria-label="Type of item to check" aria-orientation="horizontal">
@@ -367,7 +334,7 @@ export default function CheckerClient() {
               <span>{kind === "qr" ? "Choose a QR image" : "Choose a screenshot"}</span>
               <input type="file" accept="image/png,image/jpeg,image/webp,image/avif" onChange={(event) => void inspectImage(event.target.files?.[0])} />
             </label>
-            {/* A user-selected blob URL never leaves this browser and is not compatible with the site image optimizer. */}
+            {/* User-selected previews use a temporary blob URL and cannot use the site image optimizer. */}
             {/* eslint-disable-next-line @next/next/no-img-element */}
             {imageUrl && <img className="checker-image-preview" src={imageUrl} alt="Selected image preview" />}
           </div>}
@@ -383,31 +350,31 @@ export default function CheckerClient() {
             <button className="button button-primary checker-submit" type="button" onClick={() => void runCheck()} disabled={!value.trim() || isChecking}>{isChecking ? "Checking…" : "Run full check"}</button>
             <button className="checker-clear" type="button" onClick={clearCheck}>Clear</button>
           </div>
-          <p className="checker-processing-note"><span aria-hidden="true">●</span> Message and image analysis stays in this browser. Only minimized web addresses are sent for reputation checks; provider credentials remain on the server.</p>
+          <p className="checker-processing-note"><span aria-hidden="true">●</span> Your submitted text or destination is sent securely to PauseSure for this check and is not retained in application data or request logs. Web addresses may also be checked against Google Web Risk.</p>
         </div>
       </section>
 
       <aside className="checker-result">
         <div className="checker-result-live" aria-live="polite" aria-busy={isChecking}>
-          {!result ? <div className="checker-empty">
+          {!result && !checkError ? <div className="checker-empty">
             <span>Pause → Check → Verify</span>
             <h2>{isChecking ? "Checking…" : "A result should explain itself."}</h2>
             <p>{isChecking
-              ? "PauseSure is reviewing explainable warning signals and any minimized web addresses found in this check."
-              : "PauseSure combines explainable warning signals with live URL threat intelligence and returns High risk, Unclear, Likely safe, or Couldn’t verify."}</p>
+              ? "PauseSure is reviewing explainable warning signals and any web addresses found in this check."
+              : "PauseSure combines explainable fraud signals with configured threat-intelligence checks and returns High risk, Unclear, Likely safe, or Couldn’t verify."}</p>
             {!isChecking && <ol><li>Paste only what you choose.</li><li>Review the exact reasons.</li><li>Verify through an independent channel.</li></ol>}
-          </div> : <div className={`checker-result-card risk-${result.risk}`}>
+          </div> : result ? <div className={`checker-result-card risk-${result.risk}`}>
             <p className="result-eyebrow">PauseSure result</p>
             <h2>{result.label}</h2>
             <p className="result-summary">{result.summary}</p>
             <div className="checker-signals">
               {result.signals.map((item) => <article key={item.code}><strong>{item.title}</strong><p>{item.detail}</p></article>)}
             </div>
-            {reputationEvidence.map((item, index) => <ReputationEvidenceCard
-              key={`${item.submittedURL}-${index}`}
+            {result.reputation.map((item, index) => <ReputationEvidenceCard
+              key={`${item.indicator.host}-${index}`}
               evidence={item}
               index={index}
-              total={reputationEvidence.length}
+              total={result.reputation.length}
             />)}
             <div className="checker-next">
               <h3>Safer next steps</h3>
@@ -418,7 +385,8 @@ export default function CheckerClient() {
               <a href="/how-it-works" onClick={() => track("next_action_selected", { action: "verify", risk: result.risk }, analyticsEnabled)}>Verify independently</a>
               <a href="/resources" onClick={() => track("next_action_selected", { action: "recover", risk: result.risk }, analyticsEnabled)}>I already acted</a>
             </div>
-          </div>}
+          </div> : null}
+          {checkError && <div className="checker-empty" role="alert"><span>Check interrupted</span><h2>Try the check again.</h2><p>{checkError}</p></div>}
         </div>
 
         <label className="analytics-choice">
