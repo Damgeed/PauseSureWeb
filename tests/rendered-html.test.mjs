@@ -30,19 +30,28 @@ test("renders the public multi-page company site", async () => {
     assert.match(csp, /base-uri 'none'/);
     assert.match(csp, /img-src 'self' data: blob:/);
     assert.match(csp, /script-src-attr 'none'/);
+    const nonceMatch = csp.match(/script-src 'nonce-([A-Za-z0-9+/=]+)' 'strict-dynamic'/);
+    assert.ok(nonceMatch, "executable scripts should use a strict per-response nonce policy");
+    assert.doesNotMatch(csp, /script-src[^;]*'unsafe-inline'/);
     assert.match(csp, /style-src 'self'(?:;|$)/);
     assert.match(csp, /style-src-attr 'none'/);
     assert.doesNotMatch(csp, /style-src[^;]*'unsafe-inline'/);
     assert.deepEqual(csp.match(/https?:\/\/[^\s;]+/g) ?? [], [reputationOrigin]);
     assert.doesNotMatch(csp, /\*/u, "CSP should not allow wildcard resource origins");
     const html = await response.text();
+    const escapedNonce = nonceMatch[1].replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
+    for (const match of html.matchAll(/<script\b([^>]*)>/giu)) {
+      const attributes = match[1] ?? "";
+      if (/\btype=["']application\/ld\+json["']/iu.test(attributes)) continue;
+      assert.match(attributes, new RegExp(`\\bnonce=["']${escapedNonce}["']`, "u"), `${route} emitted an executable script without the renderer nonce`);
+    }
     assert.match(html, /PauseSure/i);
     assert.doesNotMatch(html, /codex-preview/i);
     assert.doesNotMatch(html, /(?:OpenAI|ChatGPT)/i, `${route} should not expose hosting-platform branding`);
     assert.doesNotMatch(html, /mailto:/i, `${route} should not advertise an unverified email route`);
     assert.doesNotMatch(html, /\/(?:_next|_vinext)\/image\?/i, `${route} should use deploy-safe image URLs`);
     assert.doesNotMatch(html, /(?:in active development|still in development|pre-release|coming to iPhone|product in development|development-stage|private development|not yet listed|will appear when|when it becomes available|authorized testers|when available)/i, `${route} should use deliberate ready-state language`);
-    assert.doesNotMatch(html, /(?:\blocal\b|\bunavailable\b|on[- ]device|in (?:this|your) browser|private browser|live URL intelligence|coming soon|coming up)/i, `${route} should not restore removed interface wording`);
+    assert.doesNotMatch(html, /(?:\blocal(?:ly)?\b|\bunavailable\b|\boffline\b|on (?:the )?device|on-device|in (?:this|your) browser|private browser|live URL intelligence|coming soon|coming up)/i, `${route} should not restore removed interface wording`);
     const canonicalUrl = `https://pausesure.com${route === "/" ? "" : route}`;
     assert.ok(html.includes(`<link rel="canonical" href="${canonicalUrl}"/>`), `${route} should have a self-referencing canonical URL`);
     assert.ok(html.includes(`<meta property="og:url" content="${canonicalUrl}"/>`), `${route} should have a route-specific Open Graph URL`);
@@ -66,10 +75,24 @@ test("renders the public multi-page company site", async () => {
     }
 
     if (route === "/check") {
+      assert.match(html, /does not open the submitted site/iu);
+      assert.match(html, /currently responds, has been deactivated, or later returns/iu);
       assert.match(html, /role="tablist"/i);
       assert.match(html, /role="tab"[^>]*aria-controls="checker-input-panel"/i);
       assert.match(html, /role="tabpanel"[^>]*aria-labelledby="checker-tab-text"/i);
       assert.match(html, /class="checker-result-live"[^>]*aria-live="polite"/i);
+      const sensitiveControl = html.match(/<textarea\b[^>]*id="check-content"[^>]*>/iu)?.[0] ?? "";
+      assert.match(sensitiveControl, /\bautocomplete="off"/iu);
+      assert.match(sensitiveControl, /\bautocorrect="off"/iu);
+      assert.match(sensitiveControl, /\bautocapitalize="none"/iu);
+      assert.match(sensitiveControl, /\bspellcheck="false"/iu);
+      assert.match(sensitiveControl, /\bmaxlength="16000"/iu);
+      assert.match(html, /submitted text, phone number, or destination/iu);
+    }
+
+    if (route === "/privacy") {
+      assert.match(html, /sends the text, phone number, or destination you submit/iu);
+      assert.match(html, /retained for up to 180 days/iu);
     }
   }
 
@@ -78,9 +101,48 @@ test("renders the public multi-page company site", async () => {
   assert.match(await missing.text(), /This link does not lead to a PauseSure page/i);
 });
 
+test("does not grant the renderer nonce to untrusted response scripts", async () => {
+  const workerUrl = new URL("../dist/server/index.js", import.meta.url);
+  workerUrl.searchParams.set("nonce-test", `${process.pid}-${Date.now()}`);
+  const { withSecurityHeaders } = await import(workerUrl.href);
+  assert.equal(typeof withSecurityHeaders, "function");
+  const response = await withSecurityHeaders(new Response(
+    "<html><body><script>globalThis.injected = true</script></body></html>",
+    { headers: { "content-type": "text/html; charset=utf-8" } },
+  ), "trusted-renderer-nonce");
+  const html = await response.text();
+  assert.doesNotMatch(html, /<script[^>]*\bnonce=/iu);
+  assert.match(response.headers.get("content-security-policy") ?? "", /'nonce-trusted-renderer-nonce'/u);
+});
+
 test("uses only the canonical production analysis route for checker decisions", async () => {
   const source = await readFile(new URL("../app/check/checker-client.tsx", import.meta.url), "utf8");
   assert.match(source, /\/v1\/analysis\/check/);
+  assert.match(source, /redirect:\s*"error"/u, "submitted content must never follow an HTTP redirect");
+  assert.match(source, /response\.url\s*!==\s*analysisEndpoint/u, "the analysis response must come from the fixed endpoint");
+  const sensitiveControlSources = source
+    .split("\n")
+    .filter((line) => line.includes("id=\"check-content\"") && (line.includes("<input") || line.includes("<textarea")));
+  assert.equal(sensitiveControlSources.length, 2);
+  for (const tag of sensitiveControlSources) {
+    assert.match(tag, /autoComplete="off"/u);
+    assert.match(tag, /autoCorrect="off"/u);
+    assert.match(tag, /autoCapitalize="none"/u);
+    assert.match(tag, /spellCheck=\{false\}/u);
+    assert.match(tag, /maxLength=\{maximumCheckValueCharacters\}/u);
+  }
+  assert.match(source, /const analyticsConsent = useRef<AnalyticsConsent>\(\{ enabled: false \}\)/u);
+  assert.match(
+    source,
+    /function updateAnalytics\(enabled: boolean\) \{\s*analyticsConsent\.current\.enabled = enabled;\s*setAnalyticsEnabled\(enabled\);/u,
+    "opt-out must update the stable consent gate before React schedules a rerender",
+  );
+  const analyticsCalls = source.split("\n").filter((line) => line.includes("trackPrivacyEvent("));
+  assert.equal(analyticsCalls.length, 5);
+  assert.ok(
+    analyticsCalls.every((line) => line.includes("analyticsConsent.current")),
+    "every event emission must read live consent instead of a rendered boolean closure",
+  );
   assert.doesNotMatch(source, /analyzeCheck|combineReputationDecision|\/v1\/reputation\/check/);
 });
 
@@ -89,6 +151,8 @@ test("permits browser reputation requests only to the production gateway", async
   const cspLine = headers.split("\n").find((line) => line.includes("Content-Security-Policy:")) ?? "";
 
   assert.match(cspLine, /connect-src 'self' https:\/\/pausesure-production\.up\.railway\.app(?:;|$)/);
+  assert.match(cspLine, /script-src 'none'/);
+  assert.doesNotMatch(cspLine, /script-src[^;]*'unsafe-inline'/);
   assert.deepEqual(cspLine.match(/https?:\/\/[^\s;]+/g) ?? [], [reputationOrigin]);
   assert.doesNotMatch(cspLine, /\*/u);
 });
@@ -142,6 +206,7 @@ test("publishes a schema-valid Scam Pulse feed backed by official sources", asyn
   const headers = await readFile(new URL("../public/_headers", import.meta.url), "utf8");
   assert.match(headers, /\/scam-pulse\/\*\.json[\s\S]*Content-Type:\s*application\/json; charset=utf-8/);
   assert.match(headers, /\/scam-pulse\/\*\.json[\s\S]*Cache-Control:\s*public, max-age=300, must-revalidate/);
+  assert.match(headers, /\/_next\/static\/\*[\s\S]*Cache-Control:\s*public, max-age=31536000, immutable/);
 });
 
 test("accepts only same-origin, allowlisted, content-free analytics", async () => {
@@ -184,7 +249,28 @@ test("accepts only same-origin, allowlisted, content-free analytics", async () =
   assert.equal(batches[0].length, 1, "only aggregate upserts should run in the request path");
   assert.ok(batches[0][0].values.every((value) => !String(value).includes("http")), "aggregate values should contain no checked URL");
   assert.ok(batches[0][0].values.every((value) => value !== "192.0.2.10"), "the edge rate-limit key must never enter D1");
-  assert.deepEqual(rateLimitKeys, ["privacy-events:192.0.2.10"]);
+  assert.deepEqual(rateLimitKeys, ["privacy-events:v4:192.0.2.10"]);
+
+  const ipv6RateLimitKeys = [];
+  const ipv6Env = {
+    ...env,
+    DB: { ...DB, async batch(statements) { return statements.map(() => ({ success: true })); } },
+    ANALYTICS_RATE_LIMITER: {
+      async limit({ key }) { ipv6RateLimitKeys.push(key); return { success: true }; },
+    },
+  };
+  for (const address of ["2001:db8:abcd:42::1", "2001:db8:abcd:42:ffff::2"]) {
+    const response = await worker.fetch(new Request("https://pausesure.com/api/privacy-events", {
+      method: "POST",
+      headers: { ...analyticsHeaders, "cf-connecting-ip": address },
+      body: JSON.stringify(validBody),
+    }), ipv6Env, ctx);
+    assert.equal(response.status, 204);
+  }
+  assert.deepEqual(ipv6RateLimitKeys, [
+    "privacy-events:v6:2001:0db8:abcd:0042/64",
+    "privacy-events:v6:2001:0db8:abcd:0042/64",
+  ], "IPv6 addresses in one delegated /64 must share an abuse-control key");
 
   const identifying = await worker.fetch(new Request("https://pausesure.com/api/privacy-events", {
     method: "POST",
@@ -277,6 +363,28 @@ test("accepts only same-origin, allowlisted, content-free analytics", async () =
   assert.equal(failedLimiter.status, 503, "analytics must fail closed when the edge limiter errors");
   assert.equal(batches.length, 1, "limiter failures must not touch D1");
 
+  const logged = [];
+  const originalConsoleError = console.error;
+  console.error = (...values) => { logged.push(values); };
+  let failedDatabase;
+  try {
+    failedDatabase = await worker.fetch(new Request("https://pausesure.com/api/privacy-events", {
+      method: "POST",
+      headers: analyticsHeaders,
+      body: JSON.stringify(validBody),
+    }), {
+      ...env,
+      DB: { ...DB, async batch() { throw new Error("sensitive provider detail"); } },
+    }, ctx);
+  } finally {
+    console.error = originalConsoleError;
+  }
+  assert.equal(failedDatabase.status, 503, "D1 failures must stay inside the generic response boundary");
+  assert.equal(failedDatabase.headers.get("cache-control"), "no-store");
+  assert.match(failedDatabase.headers.get("content-security-policy") ?? "", /default-src 'self'/u);
+  assert.deepEqual(await failedDatabase.json(), { error: "Request could not be completed." });
+  assert.deepEqual(logged, [["[PauseSure] Request handling failed."]]);
+
   assert.equal(runs.length, 0, "retention cleanup must not run in a user request");
 });
 
@@ -304,7 +412,7 @@ test("runs aggregate retention cleanup from the daily scheduled handler", async 
   await Promise.all(scheduledWork);
 
   assert.equal(runs.length, 1);
-  assert.match(runs[0].sql, /^DELETE FROM privacy_event_daily WHERE day < \?$/);
+  assert.match(runs[0].sql, /^DELETE FROM privacy_event_daily WHERE day <= \?$/);
   assert.match(runs[0].values[0], /^\d{4}-\d{2}-\d{2}$/);
 
   const logged = [];
