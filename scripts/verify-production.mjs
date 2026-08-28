@@ -42,7 +42,9 @@ function verifyHtmlHeaders(response) {
 }
 
 async function verifyCheckerBundle(html) {
-  const scriptSources = [...html.matchAll(/<script\b[^>]*\bsrc=["']([^"']+)["'][^>]*>/giu)]
+  // Vinext can advertise route-specific chunks in the rendered RSC payload
+  // instead of emitting every chunk as an initial script tag.
+  const scriptSources = [...html.matchAll(/["'](\/_next\/static\/chunks\/[A-Za-z0-9_~.-]+\.js)["']/gu)]
     .map((match) => new URL(match[1], canonicalOrigin).toString())
     .filter((url, index, urls) => urls.indexOf(url) === index);
   assert.ok(scriptSources.length > 0, "The checker page must load executable assets");
