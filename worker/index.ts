@@ -3,7 +3,7 @@ import handler from "vinext/server/app-router-entry";
 import { deleteExpiredPrivacyEvents, handlePrivacyEvents, type PrivacyEventEnv } from "./privacy-events";
 
 const canonicalOrigin = "https://pausesure.com";
-const webReleaseVersion = "pausesure-web-6.2.0";
+const webReleaseVersion = "pausesure-web-6.3.0";
 
 interface Env extends PrivacyEventEnv {
   ASSETS: Fetcher;

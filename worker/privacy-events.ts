@@ -14,7 +14,7 @@ const eventSchemas = {
   next_action_selected: { action: actionValues, risk: riskValues, channel: channelValues },
 } as const;
 
-const createPrivacyEventTable = `
+export const createPrivacyEventTable = `
   CREATE TABLE IF NOT EXISTS privacy_event_daily (
     day TEXT NOT NULL CHECK (
       length(day) = 10

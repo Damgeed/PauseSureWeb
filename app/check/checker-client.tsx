@@ -14,6 +14,12 @@ import {
   trackPrivacyEvent,
   type AnalyticsConsent,
 } from "./privacy-analytics";
+import {
+  decodedImageError,
+  normalizeScreenshot,
+  sourceImageError,
+  type NormalizedScreenshot,
+} from "./image-normalization";
 
 const kinds: Array<{ id: WebCheckKind; label: string; description: string }> = [
   { id: "text", label: "Message", description: "Text, email or social message" },
@@ -23,43 +29,65 @@ const kinds: Array<{ id: WebCheckKind; label: string; description: string }> = [
   { id: "qr", label: "QR code", description: "Decode and inspect the destination" },
 ];
 
-const allowedImageTypes = new Set(["image/avif", "image/jpeg", "image/png", "image/webp"]);
-const maximumImageBytes = 12 * 1024 * 1024;
-const maximumImageDimension = 8_192;
-const maximumImagePixels = 25_000_000;
 const maximumAnalysisResponseBytes = 96 * 1024;
 const maximumCheckValueCharacters = 16_000;
+const standardAnalysisTimeoutMilliseconds = 15_000;
+const imageAnalysisTimeoutMilliseconds = 25_000;
 const analysisEndpoint = "https://pausesure-production.up.railway.app/v1/analysis/check";
+const imageAnalysisEndpoint = "https://pausesure-production.up.railway.app/v1/analysis/check-image";
 
-async function requestAnalysis(
-  kind: WebCheckKind,
-  value: string,
+async function requestAnalysisPayload(
+  endpoint: string,
+  expectedKind: WebCheckKind,
+  payload: unknown,
   controller: AbortController,
+  timeoutMilliseconds: number = standardAnalysisTimeoutMilliseconds,
 ): Promise<WebCheckResult | null> {
-  const timeout = window.setTimeout(() => controller.abort(), 15_000);
+  const timeout = window.setTimeout(() => controller.abort(), timeoutMilliseconds);
   try {
-    const response = await fetch(analysisEndpoint, {
+    const response = await fetch(endpoint, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ kind, value }),
+      body: JSON.stringify(payload),
       cache: "no-store",
       credentials: "omit",
       redirect: "error",
       referrerPolicy: "no-referrer",
       signal: controller.signal,
     });
-    if (!response.ok || response.url !== analysisEndpoint) {
+    if (!response.ok || response.url !== endpoint) {
       try { await response.body?.cancel(); } catch { /* response stream already failed */ }
       return null;
     }
-    const payload = await readBoundedJSON(response, maximumAnalysisResponseBytes);
-    if (payload === null) return null;
-    return parseAnalysisResponse(payload, kind);
+    const responsePayload = await readBoundedJSON(response, maximumAnalysisResponseBytes);
+    if (responsePayload === null) return null;
+    return parseAnalysisResponse(responsePayload, expectedKind);
   } catch {
     return null;
   } finally {
     window.clearTimeout(timeout);
   }
+}
+
+async function requestAnalysis(
+  kind: WebCheckKind,
+  value: string,
+  controller: AbortController,
+): Promise<WebCheckResult | null> {
+  return requestAnalysisPayload(analysisEndpoint, kind, { kind, value }, controller);
+}
+
+async function requestImageAnalysis(
+  image: NormalizedScreenshot,
+  controller: AbortController,
+): Promise<WebCheckResult | null> {
+  return requestAnalysisPayload(
+    imageAnalysisEndpoint,
+    "screenshot",
+    { kind: "screenshot", image },
+    controller,
+    imageAnalysisTimeoutMilliseconds,
+  );
 }
 
 function formatLookupTime(value: string): string {
@@ -106,10 +134,13 @@ export default function CheckerClient() {
   const [isChecking, setIsChecking] = useState(false);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [imageStatus, setImageStatus] = useState<string | null>(null);
+  const [normalizedImage, setNormalizedImage] = useState<NormalizedScreenshot | null>(null);
+  const [screenshotSource, setScreenshotSource] = useState<"image" | "manual">("manual");
   const [analyticsEnabled, setAnalyticsEnabled] = useState(false);
   const [checkSequence] = useState(() => new LatestCheckSequence());
   const [imageSequence] = useState(() => new LatestCheckSequence());
   const activeCheckController = useRef<AbortController | null>(null);
+  const imageInput = useRef<HTMLInputElement | null>(null);
   const analyticsConsent = useRef<AnalyticsConsent>({ enabled: false });
   const selectedKind = useMemo(() => kinds.find((item) => item.id === kind) ?? kinds[0], [kind]);
 
@@ -142,6 +173,10 @@ export default function CheckerClient() {
     invalidatePendingCheck();
     imageSequence.invalidate();
     setValue(next);
+    if (kind === "screenshot") {
+      setScreenshotSource("manual");
+      setImageStatus("Using the pasted-text fallback. No screenshot will be uploaded.");
+    }
     setResult(null);
     setCheckError(null);
   }
@@ -152,6 +187,12 @@ export default function CheckerClient() {
     setValue("");
     setResult(null);
     setCheckError(null);
+    setImageStatus(null);
+    setNormalizedImage(null);
+    setScreenshotSource("manual");
+    if (imageUrl) URL.revokeObjectURL(imageUrl);
+    setImageUrl(null);
+    if (imageInput.current) imageInput.current.value = "";
   }
 
   function chooseKind(next: WebCheckKind) {
@@ -163,8 +204,11 @@ export default function CheckerClient() {
     setResult(null);
     setCheckError(null);
     setImageStatus(null);
+    setNormalizedImage(null);
+    setScreenshotSource("manual");
     if (imageUrl) URL.revokeObjectURL(imageUrl);
     setImageUrl(null);
+    if (imageInput.current) imageInput.current.value = "";
   }
 
   function handleKindKeyDown(event: KeyboardEvent<HTMLButtonElement>, index: number) {
@@ -190,6 +234,9 @@ export default function CheckerClient() {
   async function runCheck() {
     const inputKind = kind;
     const inputValue = value;
+    const inputImage = normalizedImage;
+    const useScreenshotImage = inputKind === "screenshot" && screenshotSource === "image";
+    if (useScreenshotImage && !inputImage) return;
     const requestSequence = checkSequence.begin();
     activeCheckController.current?.abort();
     const controller = new AbortController();
@@ -200,13 +247,26 @@ export default function CheckerClient() {
     setResult(null);
     setCheckError(null);
     try {
-      const next = await requestAnalysis(inputKind, inputValue, controller);
+      const next = useScreenshotImage && inputImage
+        ? await requestImageAnalysis(inputImage, controller)
+        : await requestAnalysis(inputKind, inputValue, controller);
       if (!checkSequence.isCurrent(requestSequence)) return;
       if (!next) {
-        setCheckError("PauseSure couldn’t complete this check. Please try again.");
+        setCheckError(useScreenshotImage
+          ? "PauseSure couldn’t complete the screenshot check. Try again, or choose the pasted-text fallback below."
+          : "PauseSure couldn’t complete this check. Please try again.");
         return;
       }
       setResult(next);
+      if (inputKind === "screenshot") {
+        setValue("");
+        setNormalizedImage(null);
+        setScreenshotSource("manual");
+        setImageStatus("Check complete. Any prepared screenshot data and preview have been cleared.");
+        if (imageUrl) URL.revokeObjectURL(imageUrl);
+        setImageUrl(null);
+        if (imageInput.current) imageInput.current.value = "";
+      }
       trackPrivacyEvent("web_check_completed", { input: inputKind, risk: next.risk }, analyticsConsent.current);
       trackPrivacyEvent("result_viewed", { input: inputKind, risk: next.risk }, analyticsConsent.current);
     } finally {
@@ -224,14 +284,17 @@ export default function CheckerClient() {
     setCheckError(null);
     setValue("");
     setImageStatus(null);
+    setNormalizedImage(null);
+    setScreenshotSource("manual");
     if (imageUrl) URL.revokeObjectURL(imageUrl);
     if (!file) {
       setImageUrl(null);
       return;
     }
-    if (!allowedImageTypes.has(file.type.toLowerCase()) || file.size > maximumImageBytes) {
+    const sourceError = sourceImageError(file);
+    if (sourceError) {
       setImageUrl(null);
-      setImageStatus("Choose a PNG, JPEG, WebP, or AVIF image smaller than 12 MB.");
+      setImageStatus(sourceError);
       return;
     }
 
@@ -240,13 +303,10 @@ export default function CheckerClient() {
     try {
       bitmap = await createImageBitmap(file);
       if (!imageSequence.isCurrent(imageRequest)) return;
-      if (
-        bitmap.width > maximumImageDimension ||
-        bitmap.height > maximumImageDimension ||
-        bitmap.width * bitmap.height > maximumImagePixels
-      ) {
+      const decodedError = decodedImageError(bitmap.width, bitmap.height);
+      if (decodedError) {
         setImageUrl(null);
-        setImageStatus("Choose an image with smaller pixel dimensions.");
+        setImageStatus(decodedError);
         return;
       }
 
@@ -257,8 +317,19 @@ export default function CheckerClient() {
       }
       setImageUrl(previewURL);
       previewReady = true;
-      setImageStatus("Image ready. Paste the visible wording below for a message check.");
-      if (kind !== "qr") return;
+      if (kind === "screenshot") {
+        setImageStatus("Preparing a protected screenshot upload…");
+        const preparedImage = await normalizeScreenshot(bitmap, file.type);
+        if (!imageSequence.isCurrent(imageRequest)) return;
+        if (!preparedImage) {
+          setImageStatus("This screenshot could not be prepared for secure OCR. Paste the visible wording below instead.");
+          return;
+        }
+        setNormalizedImage(preparedImage);
+        setScreenshotSource("image");
+        setImageStatus("Screenshot ready. Run the full check to use server OCR and the shared PauseSure fraud engine.");
+        return;
+      }
 
       const Detector = (globalThis as unknown as { BarcodeDetector?: new (options: { formats: string[] }) => { detect(source: ImageBitmap): Promise<Array<{ rawValue: string }>> } }).BarcodeDetector;
       if (!Detector) {
@@ -278,7 +349,7 @@ export default function CheckerClient() {
       if (!previewReady) setImageUrl(null);
       setImageStatus(kind === "qr"
         ? "The QR code could not be decoded. Paste the destination instead."
-        : "The image could not be read safely. Try a different PNG, JPEG, WebP, or AVIF file.");
+        : "The screenshot could not be prepared for secure OCR. Try another image or paste the visible wording instead.");
     } finally {
       bitmap?.close();
     }
@@ -290,13 +361,29 @@ export default function CheckerClient() {
     window.localStorage.setItem(analyticsPreferenceKey, enabled ? "yes" : "no");
   }
 
+  function chooseScreenshotSource(next: "image" | "manual") {
+    invalidatePendingCheck();
+    if (next === "manual") imageSequence.invalidate();
+    setScreenshotSource(next);
+    setImageStatus(next === "image"
+      ? "Selected screenshot ready. Run the full check to use server OCR and the shared PauseSure fraud engine."
+      : "Using the pasted-text fallback. No screenshot will be uploaded.");
+    setResult(null);
+    setCheckError(null);
+  }
+
   const needsImage = kind === "screenshot" || kind === "qr";
+  const canRunCheck = kind === "screenshot" && screenshotSource === "image"
+    ? normalizedImage !== null
+    : value.trim().length > 0;
   const placeholder = kind === "link"
     ? "pausesure.com or https://example.com/account/verify"
     : kind === "phone"
       ? "+1 202 555 0123"
-      : needsImage
-        ? "Paste the words visible in the image, or the decoded QR destination…"
+      : kind === "screenshot"
+        ? "If image OCR is not suitable, paste the visible wording here instead…"
+        : kind === "qr"
+          ? "Paste the decoded QR destination here if automatic decoding is not suitable…"
         : "Paste the message, email or conversation excerpt that concerns you…";
 
   return (
@@ -336,25 +423,41 @@ export default function CheckerClient() {
           {needsImage && <div className="image-input-row">
             <label className="image-picker">
               <span>{kind === "qr" ? "Choose a QR image" : "Choose a screenshot"}</span>
-              <input type="file" accept="image/png,image/jpeg,image/webp,image/avif" onChange={(event) => void inspectImage(event.target.files?.[0])} />
+              <input ref={imageInput} type="file" accept="image/png,image/jpeg,image/webp,image/avif" onChange={(event) => void inspectImage(event.target.files?.[0])} />
             </label>
             {/* User-selected previews use a temporary blob URL and cannot use the site image optimizer. */}
             {/* eslint-disable-next-line @next/next/no-img-element */}
             {imageUrl && <img className="checker-image-preview" src={imageUrl} alt="Selected image preview" />}
           </div>}
           {imageStatus && <p className="checker-image-status" role="status">{imageStatus}</p>}
-          <label htmlFor="check-content">{selectedKind.label} details</label>
+          {kind === "screenshot" && normalizedImage && <fieldset className="checker-image-mode">
+            <legend>Choose the screenshot check source</legend>
+            <label>
+              <input type="radio" name="screenshot-source" checked={screenshotSource === "image"} onChange={() => chooseScreenshotSource("image")} />
+              <span><strong>Selected screenshot</strong><small>Use server OCR and the full shared fraud engine.</small></span>
+            </label>
+            <label>
+              <input type="radio" name="screenshot-source" checked={screenshotSource === "manual"} onChange={() => chooseScreenshotSource("manual")} />
+              <span><strong>Pasted wording</strong><small>Use this explicit fallback when image OCR is not suitable.</small></span>
+            </label>
+          </fieldset>}
+          <label htmlFor="check-content">{kind === "screenshot" ? "Manual text fallback" : `${selectedKind.label} details`}</label>
+          {kind === "screenshot" && <p className="checker-field-help" id="screenshot-fallback-help">Optional. Typing here switches this check to the pasted wording instead of uploading the selected screenshot.</p>}
           {kind === "link" && <p className="checker-field-help" id="link-format-help">No http://, https://, or www. is needed. Paste a complete address such as pausesure.com; an incomplete ending such as www.pausesure will be flagged.</p>}
           {kind === "link" || kind === "phone" ? (
             <input id="check-content" value={value} onChange={(event) => updateValue(event.target.value)} placeholder={placeholder} autoComplete="off" autoCorrect="off" autoCapitalize="none" spellCheck={false} maxLength={maximumCheckValueCharacters} inputMode={kind === "phone" ? "tel" : "url"} aria-describedby={kind === "link" ? "link-format-help" : undefined} />
           ) : (
-            <textarea id="check-content" value={value} onChange={(event) => updateValue(event.target.value)} placeholder={placeholder} autoComplete="off" autoCorrect="off" autoCapitalize="none" spellCheck={false} maxLength={maximumCheckValueCharacters} rows={7} />
+            <textarea id="check-content" value={value} onChange={(event) => updateValue(event.target.value)} placeholder={placeholder} autoComplete="off" autoCorrect="off" autoCapitalize="none" spellCheck={false} maxLength={maximumCheckValueCharacters} rows={7} aria-describedby={kind === "screenshot" ? "screenshot-fallback-help screenshot-processing-note" : undefined} />
           )}
           <div className="checker-controls">
-            <button className="button button-primary checker-submit" type="button" onClick={() => void runCheck()} disabled={!value.trim() || isChecking}>{isChecking ? "Checking…" : "Run full check"}</button>
+            <button className="button button-primary checker-submit" type="button" onClick={() => void runCheck()} disabled={!canRunCheck || isChecking}>{isChecking ? "Checking…" : "Run full check"}</button>
             <button className="checker-clear" type="button" onClick={clearCheck}>Clear</button>
           </div>
-          <p className="checker-processing-note"><span aria-hidden="true">●</span> Your submitted text, phone number, or destination is sent securely to PauseSure for this check and is not retained in application data or request logs. Web addresses may also be checked against Google Web Risk.</p>
+          <p className="checker-processing-note" id="screenshot-processing-note"><span aria-hidden="true">●</span>{kind === "screenshot"
+            ? " When you run an image check, the normalized screenshot is sent securely to PauseSure and Google Cloud Vision for text recognition. PauseSure analyzes the extracted text; eligible web addresses may also be checked through Google Web Risk. PauseSure does not retain the image or extracted text in application data or request logs."
+            : kind === "qr"
+              ? " The selected QR image is not uploaded. Only decoded content that you run is sent securely to PauseSure; eligible web addresses may also be checked through Google Web Risk."
+              : " Your submitted text, phone number, or destination is sent securely to PauseSure for this check and is not retained in application data or request logs. Web addresses may also be checked against Google Web Risk."}</p>
         </div>
       </section>
 

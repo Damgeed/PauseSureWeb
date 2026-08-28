@@ -11,7 +11,7 @@ export const metadata = pageMetadata({
 const inputs = [
   ["Message", "Paste a text or email, review pressure, impersonation, payment, and secrecy signals, and check each bounded web address without sending the surrounding message."],
   ["Link", "Inspect the address structure, check the bounded address against Google Web Risk, and verify high-impact requests through an official channel you find independently."],
-  ["Screenshot", "Select a screenshot for private preview, then paste the visible wording into the same explainable review."],
+  ["Screenshot", "Select a supported screenshot for server text recognition, then run the extracted evidence through the same shared PauseSure fraud engine and Google Web Risk checks used for other inputs. Pasted wording remains available as a fallback."],
   ["QR code", "Read a code before following it, then separate the destination from the story around it."],
   ["Audio or voicemail", "Import a supported file you select and review its transcript in the same calm workflow. PauseSure does not record live cellular calls."],
   ["Protection setup", "Review the iPhone settings and readiness states PauseSure can inspect, with manual checks clearly identified."],

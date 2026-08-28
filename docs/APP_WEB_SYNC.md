@@ -24,7 +24,7 @@ For each app pull request, select exactly one:
 | --- | --- |
 | New, renamed, removed, or materially changed feature | `/product`, `/how-it-works`, home page, support |
 | Changed safety result, wording, limitation, or recovery guidance | `/safety`, `/resources`, support, terms |
-| Changed data collection, retention, sharing, AI/vendor use, account behavior, or permissions | `/privacy`, `/safety`, `/account-deletion`, App Store privacy answers |
+| Changed data collection, retention, sharing, OCR/AI/vendor use, account behavior, or permissions | `/privacy`, `/safety`, `/account-deletion`, App Store privacy answers |
 | Authentication, subscription, pricing, eligibility, or availability change | Product, support, terms, home page calls to action |
 | New target audience, partnership, market, or localization | Home, company, product, metadata, sitemap |
 | New support channel or incident procedure | Support, company, security policy |
@@ -41,6 +41,7 @@ Before an App Store release:
 - Confirm support, security, account deletion, and recovery links work without sign-in.
 - Confirm apex and `www` HTTPS behavior, operational domain email, SPF/DKIM/DMARC, and external mailbox delivery.
 - Confirm app and website use the same current logo, primary action color (`#13aec3`), terminology, and product status.
+- Confirm screenshot OCR and all other supported inputs use the same current analysis schema, engine-version policy, Google Web Risk semantics, and fail-closed result language.
 - Run website lint, build, rendered-route tests, and broken-link/image checks.
 - Publish the approved website update before or at the same time as the app release.
 

@@ -6,7 +6,7 @@ Use this matrix before every App Store submission and every material website cam
 | --- | --- | --- | --- |
 | Message and email review | Device test covering supported inputs, limits, result explanation, and error states | Home, Product, How it works | App-owner verification required |
 | Link review | Safe URL handling, redirect/lookup behavior, uncertainty language, and official-route guidance | Home, Product, Resources | App-owner verification required |
-| Screenshot text recognition | Supported image formats, permission path, language coverage, failure handling, and retention | Home, Product, Privacy | App-owner verification required |
+| Screenshot text recognition | Supported image formats, upload bounds, Google Cloud Vision path, language coverage, fallback behavior, shared-engine contract, failure handling, and retention | Home, Product, Privacy | Website implemented; app-owner device verification required |
 | QR review | Supported QR formats, destination handling, safe navigation, and error states | Home, Product, Privacy | App-owner verification required |
 | Audio or voicemail import | Supported file/import routes, transcription providers, limits, consent, and retention | Home, Product, Privacy | App-owner verification required |
 | Trusted Circle | Consent, invite/revoke/leave behavior, notification privacy, encryption review, and deletion | Home, Product, Safety, Privacy | App-owner verification required |

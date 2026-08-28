@@ -1,4 +1,4 @@
-CREATE TABLE `privacy_event_daily` (
+CREATE TABLE IF NOT EXISTS `privacy_event_daily` (
 	`day` text NOT NULL,
 	`event_name` text NOT NULL,
 	`input_kind` text DEFAULT 'none' NOT NULL,

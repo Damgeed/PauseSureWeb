@@ -6,7 +6,7 @@ import { LatestCheckSequence, parseAnalysisResponse, readBoundedJSON } from "../
 function payload(overrides = {}) {
   return {
     schemaVersion: 1,
-    engineVersion: "pausesure-rules-6.2.0",
+    engineVersion: "pausesure-rules-6.3.0",
     kind: "text",
     risk: "high",
     label: "High risk",
@@ -84,7 +84,7 @@ test("bounds JSON responses and cancels every rejected response stream", async (
   }), 5), null);
   assert.equal(streamedOversizeBody.wasCancelled(), true, "streamed oversized bodies must be cancelled");
 
-  const valid = { engine: "pausesure-rules-6.2.0" };
+  const valid = { engine: "pausesure-rules-6.3.0" };
   assert.deepEqual(await readBoundedJSON(new Response(JSON.stringify(valid), {
     headers: { "content-type": "application/json; charset=utf-8" },
   }), 1_024), valid);
