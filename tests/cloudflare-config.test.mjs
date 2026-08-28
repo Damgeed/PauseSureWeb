@@ -25,6 +25,8 @@ test("uses a first-party Cloudflare Workers configuration", async () => {
   assert.ok(major > 4 || (major === 4 && minor >= 102), "Wrangler must resolve auto-provisioned D1 bindings for remote migrations");
   assert.doesNotMatch(source, /(?:database_id|account_id)"?\s*:\s*"(?:0{8}-|<|replace|example|fake)/i, "placeholder Cloudflare identifiers must not be committed");
   assert.doesNotMatch(source, /(?:OpenAI|ChatGPT|site-creator)/i);
+  assert.match(packageJson.scripts.deploy, /db:migrate:remote.*wrangler deploy/u);
+  assert.match(packageJson.scripts["deploy:built"], /db:migrate:remote.*wrangler deploy/u);
 });
 
 test("does not package hosting-control-plane metadata", async () => {

@@ -60,6 +60,12 @@ can create the D1 database because the initial configuration omits
 5. Select **Save and Deploy**. The Worker name in Cloudflare must exactly match
    the `name` in `wrangler.jsonc`.
 
+For the provisioned production database, `npm run deploy:built` verifies the
+bundle, applies every pending reviewed D1 migration, and only then publishes the
+Worker. Wrangler skips already-applied migrations and captures a backup before
+each newly applied migration. A migration failure stops the deployment before
+new application code is promoted.
+
 The first deployment provisions the D1 binding and attaches both Custom
 Domains. Cloudflare creates the DNS records and TLS certificates for those
 hostnames.
