@@ -28,6 +28,7 @@ function verifyHtmlHeaders(response) {
   assert.equal(response.headers.get("cross-origin-opener-policy"), "same-origin");
   assert.equal(response.headers.get("x-content-type-options"), "nosniff");
   assert.equal(response.headers.get("x-frame-options"), "DENY");
+  assert.equal(response.headers.get("x-pausesure-web-version"), "pausesure-web-6.2.0");
   assertIncludesToken(response.headers.get("cache-control") ?? "", "private", "Cache-Control");
   assertIncludesToken(response.headers.get("cache-control") ?? "", "no-store", "Cache-Control");
 

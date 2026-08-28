@@ -3,6 +3,7 @@ import handler from "vinext/server/app-router-entry";
 import { deleteExpiredPrivacyEvents, handlePrivacyEvents, type PrivacyEventEnv } from "./privacy-events";
 
 const canonicalOrigin = "https://pausesure.com";
+const webReleaseVersion = "pausesure-web-6.2.0";
 
 interface Env extends PrivacyEventEnv {
   ASSETS: Fetcher;
@@ -34,6 +35,7 @@ const securityHeaders = {
   "Strict-Transport-Security": "max-age=31536000",
   "X-Content-Type-Options": "nosniff",
   "X-Frame-Options": "DENY",
+  "X-PauseSure-Web-Version": webReleaseVersion,
 } as const;
 
 function createNonce(): string {

@@ -68,7 +68,7 @@ const schemaInitializationByDatabase = new WeakMap<D1Database, Promise<void>>();
 async function ensurePrivacyEventTable(database: D1Database) {
   let initialization = schemaInitializationByDatabase.get(database);
   if (!initialization) {
-    initialization = database.prepare(createPrivacyEventTable).run()
+    initialization = database.exec(createPrivacyEventTable)
       .then(() => undefined)
       .catch((error) => {
         schemaInitializationByDatabase.delete(database);
