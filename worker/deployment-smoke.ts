@@ -44,6 +44,31 @@ function jsonError(message: string, status: number, extraHeaders?: Record<string
   });
 }
 
+async function requestContainsBodyBytes(request: Request): Promise<boolean> {
+  const contentLength = request.headers.get("content-length");
+  if (contentLength !== null) {
+    if (!/^\d+$/u.test(contentLength) || Number(contentLength) !== 0) return true;
+  }
+  if (!request.body) return false;
+
+  const reader = request.body.getReader();
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) return false;
+      if (value.byteLength > 0) {
+        try { await reader.cancel("deployment smoke does not accept a body"); } catch { /* stream already closed */ }
+        return true;
+      }
+    }
+  } catch {
+    // A malformed or interrupted body stream is not accepted as an empty request.
+    return true;
+  } finally {
+    reader.releaseLock();
+  }
+}
+
 export async function handleDeploymentSmoke(
   request: Request,
   env: DeploymentSmokeEnv,
@@ -68,8 +93,7 @@ export async function handleDeploymentSmoke(
   ) {
     return jsonError("Release verification was rejected.", 403);
   }
-  const contentLength = request.headers.get("content-length");
-  if ((contentLength !== null && contentLength !== "0") || request.body !== null) {
+  if (await requestContainsBodyBytes(request)) {
     return jsonError("Release verification does not accept a request body.", 400);
   }
   if (!env.DB || !env.DEPLOYMENT_RATE_LIMITER) {

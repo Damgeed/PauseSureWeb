@@ -7,6 +7,10 @@ import {
 
 const canonicalOrigin = "https://pausesure.com";
 const expectedVersion = "pausesure-web-6.3.0";
+const requestHeaders = {
+  origin: canonicalOrigin,
+  "x-pausesure-release-version": expectedVersion,
+};
 
 function makeDatabase() {
   const calls = [];
@@ -46,12 +50,22 @@ function makeRateLimiter(success = true) {
 function request(headers = {}, body) {
   return new Request(`${canonicalOrigin}/api/deployment-smoke`, {
     method: "POST",
-    headers: {
-      origin: canonicalOrigin,
-      "x-pausesure-release-version": expectedVersion,
-      ...headers,
-    },
+    headers: { ...requestHeaders, ...headers },
     body,
+  });
+}
+
+function streamedRequest(chunks) {
+  return new Request(`${canonicalOrigin}/api/deployment-smoke`, {
+    method: "POST",
+    headers: requestHeaders,
+    body: new ReadableStream({
+      start(controller) {
+        for (const chunk of chunks) controller.enqueue(chunk);
+        controller.close();
+      },
+    }),
+    duplex: "half",
   });
 }
 
@@ -80,13 +94,26 @@ test("writes only a fixed, globally rate-limited release marker and returns an e
   );
 });
 
+test("accepts a transport-level stream that contains zero body bytes", async () => {
+  const { calls, database } = makeDatabase();
+  const { calls: limiterCalls, limiter } = makeRateLimiter();
+  const response = await handleDeploymentSmoke(streamedRequest([]), {
+    DB: database,
+    DEPLOYMENT_RATE_LIMITER: limiter,
+  }, expectedVersion);
+
+  assert.equal(response.status, 204);
+  assert.deepEqual(limiterCalls, [{ key: "deployment-smoke" }]);
+  assert.equal(calls.filter((call) => call.type === "run").length, 1);
+});
+
 test("routes the production smoke through the Worker security boundary", async () => {
   const workerUrl = new URL("../dist/server/index.js", import.meta.url);
   workerUrl.searchParams.set("deployment-smoke-test", `${process.pid}-${Date.now()}`);
   const { default: worker } = await import(workerUrl.href);
   const { calls, database } = makeDatabase();
   const { limiter } = makeRateLimiter();
-  const response = await worker.fetch(request(), {
+  const response = await worker.fetch(streamedRequest([]), {
     ASSETS: { fetch: async () => new Response("Not found", { status: 404 }) },
     DB: database,
     DEPLOYMENT_RATE_LIMITER: limiter,
@@ -108,6 +135,7 @@ test("rejects untrusted, malformed, or body-bearing requests before edge or D1 w
     request({ origin: "https://attacker.example" }),
     request({ "x-pausesure-release-version": "pausesure-web-0.0.0" }),
     request({ "content-type": "text/plain" }, "unexpected"),
+    streamedRequest([new TextEncoder().encode("unexpected")]),
   ];
 
   for (const candidate of cases) {
