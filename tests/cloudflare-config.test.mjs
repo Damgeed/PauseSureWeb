@@ -35,8 +35,9 @@ test("uses a first-party Cloudflare Workers configuration", async () => {
   assert.doesNotMatch(source, /(?:OpenAI|ChatGPT|site-creator)/i);
 });
 
-test("deploys only a CI-approved main commit without repeating the full verification suite", async () => {
+test("deploys CI-approved main commits and applies the CI verification gate to manual releases", async () => {
   const workflow = await readFile(new URL("../.github/workflows/deploy-cloudflare.yml", import.meta.url), "utf8");
+  const ciWorkflow = await readFile(new URL("../.github/workflows/web-ci.yml", import.meta.url), "utf8");
   const packageJson = JSON.parse(await readFile(new URL("../package.json", import.meta.url), "utf8"));
 
   assert.match(workflow, /workflow_run:/u);
@@ -46,13 +47,40 @@ test("deploys only a CI-approved main commit without repeating the full verifica
   assert.match(workflow, /workflow_run\.conclusion == 'success'/u);
   assert.match(workflow, /workflow_run\.head_branch == 'main'/u);
   assert.match(workflow, /workflow_run\.head_sha/u, "the deployment must publish the exact CI-reviewed commit");
+  assert.match(workflow, /workflow_dispatch:/u);
+  assert.match(
+    workflow,
+    /github\.event_name == 'workflow_dispatch' &&\s*github\.ref == 'refs\/heads\/main'/u,
+    "manual production releases must be dispatched from main",
+  );
+  assert.match(workflow, /group:\s*cloudflare-production/u);
+  assert.match(workflow, /cancel-in-progress:\s*false/u, "an in-flight production release must finish before the next one starts");
+  assert.doesNotMatch(workflow, /cancel-in-progress:\s*true/u);
   assert.match(workflow, /CLOUDFLARE_API_TOKEN:\s*\$\{\{ secrets\.CLOUDFLARE_API_TOKEN \}\}/u);
   assert.match(workflow, /CLOUDFLARE_ACCOUNT_ID:\s*\$\{\{ secrets\.CLOUDFLARE_ACCOUNT_ID \}\}/u);
+  assert.doesNotMatch(
+    workflow,
+    /\n    env:\n      CLOUDFLARE_API_TOKEN:/u,
+    "production credentials must not be exposed to install, verification, build, or smoke steps",
+  );
+  assert.equal((workflow.match(/CLOUDFLARE_API_TOKEN:\s*\$\{\{/gu) ?? []).length, 3);
+  assert.equal((workflow.match(/CLOUDFLARE_ACCOUNT_ID:\s*\$\{\{/gu) ?? []).length, 3);
   assert.match(workflow, /npm run db:migrate:remote/u);
   assert.match(workflow, /npm run build/u);
   assert.match(workflow, /npm run deploy:built/u);
   assert.match(workflow, /npm run smoke:production/u);
-  assert.doesNotMatch(workflow, /npm run verify/u, "Web CI is the verification authority; deployment must not run the same suite twice");
+  assert.match(ciWorkflow, /run:\s*npm run verify/u);
+  assert.match(
+    workflow,
+    /if:\s*github\.event_name == 'workflow_dispatch'\s*\n\s*run:\s*npm run verify/u,
+    "manual releases must pass the same verification command as Web CI",
+  );
+  assert.match(
+    workflow,
+    /if:\s*github\.event_name == 'workflow_dispatch'\s*\n\s*run:\s*npm run audit:signatures/u,
+    "manual releases must pass Web CI's dependency-signature gate",
+  );
+  assert.equal((workflow.match(/run:\s*npm run verify/gu) ?? []).length, 1, "automatic releases must rely on the exact successful Web CI run");
   assert.equal(packageJson.scripts["deploy:built"], "wrangler deploy");
   assert.equal(packageJson.scripts.deploy, "npm run verify && npm run deploy:built");
 });

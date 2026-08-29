@@ -199,7 +199,7 @@ try {
   await retryForPropagation("PauseSure web release", verifySite);
   await retryForPropagation("PauseSure D1 release write", verifyD1Write);
   await verifyBackend();
-  console.log("PauseSure production smoke passed: HTTPS/CSP, web 6.3, D1, backend 6.3, server OCR, and Google Web Risk are live.");
+  console.log(`PauseSure production smoke passed: HTTPS/CSP, ${expectedWebVersion}, D1, backend 6.3, server OCR, and Google Web Risk are live.`);
 } catch (error) {
   console.error(`PauseSure production smoke failed: ${error instanceof Error ? error.message : "unknown failure"}`);
   process.exitCode = 1;
