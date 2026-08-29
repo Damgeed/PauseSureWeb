@@ -75,7 +75,7 @@ The production smoke writes only one fixed operational row to `deployment_smoke`
 
 ```text
 id = 1
-web_version = pausesure-web-6.3.0
+web_version = pausesure-web-6.3.1
 checked_at = Unix timestamp
 ```
 
