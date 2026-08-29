@@ -6,7 +6,7 @@ import {
 } from "../worker/deployment-smoke.ts";
 
 const canonicalOrigin = "https://pausesure.com";
-const expectedVersion = "pausesure-web-6.3.1";
+const expectedVersion = "pausesure-web-6.3.0";
 
 function makeDatabase() {
   const calls = [];
