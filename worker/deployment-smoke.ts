@@ -44,6 +44,14 @@ function jsonError(message: string, status: number, extraHeaders?: Record<string
   });
 }
 
+function releaseServiceUnavailable(phase: "bindings" | "limiter" | "database") {
+  return jsonError("Release verification could not be completed.", 503, {
+    // This identifies only the failed infrastructure boundary. It never exposes
+    // SQL, binding names, request data, addresses, or database contents.
+    "x-pausesure-release-phase": phase,
+  });
+}
+
 async function requestContainsBodyBytes(request: Request): Promise<boolean> {
   const contentLength = request.headers.get("content-length");
   if (contentLength !== null) {
@@ -97,14 +105,14 @@ export async function handleDeploymentSmoke(
     return jsonError("Release verification does not accept a request body.", 400);
   }
   if (!env.DB || !env.DEPLOYMENT_RATE_LIMITER) {
-    return jsonError("Release verification could not be completed.", 503);
+    return releaseServiceUnavailable("bindings");
   }
 
   let rateLimit: { success: boolean };
   try {
     rateLimit = await env.DEPLOYMENT_RATE_LIMITER.limit({ key: "deployment-smoke" });
   } catch {
-    return jsonError("Release verification could not be completed.", 503);
+    return releaseServiceUnavailable("limiter");
   }
   if (!rateLimit.success) {
     return jsonError("Release verification is temporarily rate limited.", 429, {
@@ -121,7 +129,7 @@ export async function handleDeploymentSmoke(
       DO UPDATE SET web_version = excluded.web_version, checked_at = excluded.checked_at
     `).bind(expectedVersion, Math.floor(Date.now() / 1000)).run();
   } catch {
-    return jsonError("Release verification could not be completed.", 503);
+    return releaseServiceUnavailable("database");
   }
 
   return new Response(null, {
