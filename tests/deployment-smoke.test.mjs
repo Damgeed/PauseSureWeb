@@ -1,7 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
-  createDeploymentSmokeTable,
   handleDeploymentSmoke,
 } from "../worker/deployment-smoke.ts";
 
@@ -81,17 +80,28 @@ test("writes only a fixed, globally rate-limited release marker and returns an e
   assert.equal(response.headers.get("cache-control"), "no-store");
   assert.equal(await response.text(), "");
   assert.deepEqual(limiterCalls, [{ key: "deployment-smoke" }]);
-  assert.equal(calls.filter((call) => call.type === "exec").length, 1);
-  assert.match(calls[0].source, /CREATE TABLE IF NOT EXISTS deployment_smoke/u);
+  assert.equal(calls.filter((call) => call.type === "exec").length, 0);
   assert.equal(calls.filter((call) => call.type === "run").length, 1);
   const write = calls.find((call) => call.type === "run");
   assert.deepEqual(write.values.slice(0, 1), [expectedVersion]);
   assert.equal(typeof write.values[1], "number");
   assert.doesNotMatch(
-    `${createDeploymentSmokeTable}\n${write.source}`,
+    write.source,
     /\b(?:user_id|account_id|session_id|device_id|ip_address|url|phone_number|message|content|image|free_form)\b/iu,
     "the release marker must not add user, request, or checked-content fields",
   );
+});
+
+test("uses reviewed migrations as the only deployment-smoke schema authority", async () => {
+  const { calls, database } = makeDatabase();
+  const { limiter } = makeRateLimiter();
+  const response = await handleDeploymentSmoke(request(), {
+    DB: database,
+    DEPLOYMENT_RATE_LIMITER: limiter,
+  }, expectedVersion);
+
+  assert.equal(response.status, 204);
+  assert.equal(calls.some((call) => /\b(?:CREATE|ALTER|DROP)\b/iu.test(call.source)), false);
 });
 
 test("accepts a transport-level stream that contains zero body bytes", async () => {

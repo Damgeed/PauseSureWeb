@@ -2,7 +2,6 @@ import assert from "node:assert/strict";
 import { readdir, readFile } from "node:fs/promises";
 import { DatabaseSync } from "node:sqlite";
 import test from "node:test";
-import { createDeploymentSmokeTable } from "../worker/deployment-smoke.ts";
 import { createPrivacyEventTable } from "../worker/privacy-events.ts";
 
 const migrationDirectory = new URL("../drizzle/", import.meta.url);
@@ -146,12 +145,11 @@ test("D1 schema rejects free-form, mismatched, invalid-date, and unsafe-count ro
   }
 });
 
-test("initial migrations are safe after defensive Worker bootstrap", async () => {
+test("migrations remain safe after the analytics Worker bootstrap", async () => {
   const migrations = await migrationSources();
   const database = new DatabaseSync(":memory:");
   try {
     database.exec(createPrivacyEventTable);
-    database.exec(createDeploymentSmokeTable);
     database.prepare(`
       INSERT INTO privacy_event_daily
         (day, event_name, input_kind, risk, action, channel, event_count, updated_at)
@@ -166,14 +164,13 @@ test("initial migrations are safe after defensive Worker bootstrap", async () =>
       1,
       1_777_000_001,
     );
+    assert.doesNotThrow(() => database.exec(migrations[0].source));
+    database.exec(migrations[1].source);
+    assert.doesNotThrow(() => database.exec(migrations[2].source));
     database.prepare(`
       INSERT INTO deployment_smoke (id, web_version, checked_at)
       VALUES (1, ?, ?)
     `).run("pausesure-web-6.3.0", 1_777_000_002);
-
-    assert.doesNotThrow(() => database.exec(migrations[0].source));
-    database.exec(migrations[1].source);
-    assert.doesNotThrow(() => database.exec(migrations[2].source));
     assert.equal(
       database.prepare("SELECT event_count FROM privacy_event_daily").get().event_count,
       1,
