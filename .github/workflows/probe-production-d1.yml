@@ -39,6 +39,36 @@ jobs:
           }
           console.log(JSON.stringify({ name: database.name, database_id: database.uuid }));
           NODE
+      - name: Verify D1 schema and a direct fixed-row write
+        run: |
+          set -euo pipefail
+          npx wrangler d1 execute pausesure-web-analytics --remote --json \
+            --command "SELECT name FROM sqlite_master WHERE type = 'table' AND name IN ('privacy_event_daily', 'deployment_smoke', 'd1_migrations') ORDER BY name" \
+            > "$RUNNER_TEMP/d1-schema.json"
+          npx wrangler d1 execute pausesure-web-analytics --remote --json \
+            --command "INSERT INTO deployment_smoke (id, web_version, checked_at) VALUES (1, 'pausesure-web-6.3.0', unixepoch()) ON CONFLICT(id) DO UPDATE SET web_version = excluded.web_version, checked_at = excluded.checked_at" \
+            > "$RUNNER_TEMP/d1-write.json"
+          npx wrangler d1 execute pausesure-web-analytics --remote --json \
+            --command "SELECT id, web_version, checked_at > 0 AS timestamp_valid FROM deployment_smoke WHERE id = 1" \
+            > "$RUNNER_TEMP/d1-readback.json"
+          node --input-type=module <<'NODE'
+          import { readFile } from "node:fs/promises";
+
+          const readJson = async (name) => JSON.parse(await readFile(`${process.env.RUNNER_TEMP}/${name}`, "utf8"));
+          const schema = await readJson("d1-schema.json");
+          const readback = await readJson("d1-readback.json");
+          const schemaRows = schema.flatMap((entry) => entry.results ?? []);
+          const names = schemaRows.map((row) => row.name).sort();
+          console.log(JSON.stringify({ directD1Tables: names }));
+          if (!names.includes("privacy_event_daily") || !names.includes("deployment_smoke")) {
+            throw new Error("Expected production D1 tables were not found");
+          }
+          const row = readback.flatMap((entry) => entry.results ?? [])[0];
+          console.log(JSON.stringify({ directD1Write: row }));
+          if (row?.id !== 1 || row?.web_version !== "pausesure-web-6.3.0" || row?.timestamp_valid !== 1) {
+            throw new Error("Direct production D1 write/readback failed");
+          }
+          NODE
       - name: Probe deployment and aggregate analytics writes
         run: |
           node --input-type=module <<'NODE'
