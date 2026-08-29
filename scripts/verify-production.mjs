@@ -4,7 +4,7 @@ const canonicalOrigin = "https://pausesure.com";
 const analysisOrigin = "https://pausesure-production.up.railway.app";
 const analysisEndpoint = `${analysisOrigin}/v1/analysis/check`;
 const imageAnalysisEndpoint = `${analysisOrigin}/v1/analysis/check-image`;
-const expectedWebVersion = "pausesure-web-6.3.1";
+const expectedWebVersion = "pausesure-web-6.3.0";
 const expectedEngineVersion = "pausesure-rules-6.3.0";
 const requestTimeoutMilliseconds = 20_000;
 const propagationAttempts = 12;
@@ -194,7 +194,7 @@ try {
   await retryForPropagation("PauseSure web release", verifySite);
   await retryForPropagation("PauseSure D1 release write", verifyD1Write);
   await verifyBackend();
-  console.log("PauseSure production smoke passed: HTTPS/CSP, web 6.3.1, D1, backend 6.3, server OCR, and Google Web Risk are live.");
+  console.log("PauseSure production smoke passed: HTTPS/CSP, web 6.3, D1, backend 6.3, server OCR, and Google Web Risk are live.");
 } catch (error) {
   console.error(`PauseSure production smoke failed: ${error instanceof Error ? error.message : "unknown failure"}`);
   process.exitCode = 1;
