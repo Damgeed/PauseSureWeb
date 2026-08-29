@@ -6,7 +6,7 @@ import {
 } from "../worker/deployment-smoke.ts";
 
 const canonicalOrigin = "https://pausesure.com";
-const expectedVersion = "pausesure-web-6.3.0";
+const expectedVersion = "pausesure-web-6.3.1";
 const requestHeaders = {
   origin: canonicalOrigin,
   "x-pausesure-release-version": expectedVersion,
@@ -157,10 +157,31 @@ test("fails closed when D1 or the dedicated edge limiter is missing", async () =
     DEPLOYMENT_RATE_LIMITER: limiter,
   }, expectedVersion);
   assert.equal(missingDatabase.status, 503);
+  assert.equal(missingDatabase.headers.get("x-pausesure-release-phase"), "bindings");
 
   const { database } = makeDatabase();
   const missingLimiter = await handleDeploymentSmoke(request(), { DB: database }, expectedVersion);
   assert.equal(missingLimiter.status, 503);
+  assert.equal(missingLimiter.headers.get("x-pausesure-release-phase"), "bindings");
+});
+
+test("reports only the failed infrastructure boundary on closed service failures", async () => {
+  const { database } = makeDatabase();
+  const limiterFailure = await handleDeploymentSmoke(request(), {
+    DB: database,
+    DEPLOYMENT_RATE_LIMITER: { async limit() { throw new Error("private provider detail"); } },
+  }, expectedVersion);
+  assert.equal(limiterFailure.status, 503);
+  assert.equal(limiterFailure.headers.get("x-pausesure-release-phase"), "limiter");
+  assert.doesNotMatch(await limiterFailure.text(), /private provider detail/u);
+
+  const databaseFailure = await handleDeploymentSmoke(request(), {
+    DB: { async exec() { throw new Error("private database detail"); } },
+    DEPLOYMENT_RATE_LIMITER: makeRateLimiter().limiter,
+  }, expectedVersion);
+  assert.equal(databaseFailure.status, 503);
+  assert.equal(databaseFailure.headers.get("x-pausesure-release-phase"), "database");
+  assert.doesNotMatch(await databaseFailure.text(), /private database detail/u);
 });
 
 test("does not touch D1 when the deployment smoke rate limit is exhausted", async () => {
