@@ -1,1 +1,0 @@
-Cloudflare Git integration verification trigger. Safe to remove after production verification.
