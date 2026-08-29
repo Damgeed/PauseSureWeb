@@ -88,7 +88,7 @@ test("redirects every production HTTP and www request to the fixed HTTPS origin"
     assert.equal(response.status, 308);
     assert.equal(response.headers.get("location"), expectedLocation);
     assert.equal(response.headers.get("x-content-type-options"), "nosniff");
-    assert.equal(response.headers.get("x-pausesure-web-version"), "pausesure-web-6.3.0");
+    assert.equal(response.headers.get("x-pausesure-web-version"), "pausesure-web-6.3.1");
     assert.match(response.headers.get("content-security-policy") ?? "", /frame-ancestors 'none'/);
   }
 
