@@ -90,10 +90,10 @@ test("applies the aggregate-only D1 schema to SQLite and preserves rows", async 
     database.prepare(`
       INSERT INTO deployment_smoke (id, web_version, checked_at)
       VALUES (?, ?, ?)
-    `).run(1, "pausesure-web-6.3.1", 1_777_000_001);
+    `).run(1, "pausesure-web-6.3.0", 1_777_000_001);
     assert.deepEqual(
       { ...database.prepare("SELECT id, web_version, checked_at FROM deployment_smoke").get() },
-      { id: 1, web_version: "pausesure-web-6.3.1", checked_at: 1_777_000_001 },
+      { id: 1, web_version: "pausesure-web-6.3.0", checked_at: 1_777_000_001 },
     );
   } finally {
     database.close();
@@ -135,9 +135,9 @@ test("D1 schema rejects free-form, mismatched, invalid-date, and unsafe-count ro
       VALUES (?, ?, ?)
     `);
     for (const invalid of [
-      [2, "pausesure-web-6.3.1", 1_777_000_000],
+      [2, "pausesure-web-6.3.0", 1_777_000_000],
       [1, "private-free-text", 1_777_000_000],
-      [1, "pausesure-web-6.3.1", 0],
+      [1, "pausesure-web-6.3.0", 0],
     ]) {
       assert.throws(() => deploymentInsert.run(...invalid), /constraint failed/iu);
     }
@@ -169,7 +169,7 @@ test("initial migrations are safe after defensive Worker bootstrap", async () =>
     database.prepare(`
       INSERT INTO deployment_smoke (id, web_version, checked_at)
       VALUES (1, ?, ?)
-    `).run("pausesure-web-6.3.1", 1_777_000_002);
+    `).run("pausesure-web-6.3.0", 1_777_000_002);
 
     assert.doesNotThrow(() => database.exec(migrations[0].source));
     database.exec(migrations[1].source);
@@ -181,7 +181,7 @@ test("initial migrations are safe after defensive Worker bootstrap", async () =>
     );
     assert.equal(
       database.prepare("SELECT web_version FROM deployment_smoke").get().web_version,
-      "pausesure-web-6.3.1",
+      "pausesure-web-6.3.0",
       "the content-free deployment marker must survive tracked migration application",
     );
   } finally {
