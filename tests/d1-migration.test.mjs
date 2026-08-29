@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { readdir, readFile } from "node:fs/promises";
 import { DatabaseSync } from "node:sqlite";
 import test from "node:test";
+import { createDeploymentSmokeTable } from "../worker/deployment-smoke.ts";
 import { createPrivacyEventTable } from "../worker/privacy-events.ts";
 
 const migrationDirectory = new URL("../drizzle/", import.meta.url);
@@ -24,6 +25,7 @@ test("applies the aggregate-only D1 schema to SQLite and preserves rows", async 
     assert.deepEqual(migrations.map(({ name }) => name), [
       "0000_famous_chamber.sql",
       "0001_constrain_privacy_aggregates.sql",
+      "0002_deployment_smoke.sql",
     ]);
     database.exec(migrations[0].source);
     database.prepare(`
@@ -41,6 +43,7 @@ test("applies the aggregate-only D1 schema to SQLite and preserves rows", async 
       1_777_000_000,
     );
     database.exec(migrations[1].source);
+    database.exec(migrations[2].source);
     const columns = database
       .prepare("PRAGMA table_info(privacy_event_daily)")
       .all()
@@ -78,6 +81,20 @@ test("applies the aggregate-only D1 schema to SQLite and preserves rows", async 
         updated_at: 1_777_000_000,
       },
     );
+
+    const deploymentColumns = database
+      .prepare("PRAGMA table_info(deployment_smoke)")
+      .all()
+      .map((column) => column.name);
+    assert.deepEqual(deploymentColumns, ["id", "web_version", "checked_at"]);
+    database.prepare(`
+      INSERT INTO deployment_smoke (id, web_version, checked_at)
+      VALUES (?, ?, ?)
+    `).run(1, "pausesure-web-6.3.1", 1_777_000_001);
+    assert.deepEqual(
+      { ...database.prepare("SELECT id, web_version, checked_at FROM deployment_smoke").get() },
+      { id: 1, web_version: "pausesure-web-6.3.1", checked_at: 1_777_000_001 },
+    );
   } finally {
     database.close();
   }
@@ -112,16 +129,29 @@ test("D1 schema rejects free-form, mismatched, invalid-date, and unsafe-count ro
     ]) {
       assert.throws(() => insert.run(...invalid), /constraint failed/iu);
     }
+
+    const deploymentInsert = database.prepare(`
+      INSERT INTO deployment_smoke (id, web_version, checked_at)
+      VALUES (?, ?, ?)
+    `);
+    for (const invalid of [
+      [2, "pausesure-web-6.3.1", 1_777_000_000],
+      [1, "private-free-text", 1_777_000_000],
+      [1, "pausesure-web-6.3.1", 0],
+    ]) {
+      assert.throws(() => deploymentInsert.run(...invalid), /constraint failed/iu);
+    }
   } finally {
     database.close();
   }
 });
 
-test("initial migration is safe after defensive Worker bootstrap", async () => {
+test("initial migrations are safe after defensive Worker bootstrap", async () => {
   const migrations = await migrationSources();
   const database = new DatabaseSync(":memory:");
   try {
     database.exec(createPrivacyEventTable);
+    database.exec(createDeploymentSmokeTable);
     database.prepare(`
       INSERT INTO privacy_event_daily
         (day, event_name, input_kind, risk, action, channel, event_count, updated_at)
@@ -136,13 +166,23 @@ test("initial migration is safe after defensive Worker bootstrap", async () => {
       1,
       1_777_000_001,
     );
+    database.prepare(`
+      INSERT INTO deployment_smoke (id, web_version, checked_at)
+      VALUES (1, ?, ?)
+    `).run("pausesure-web-6.3.1", 1_777_000_002);
 
     assert.doesNotThrow(() => database.exec(migrations[0].source));
     database.exec(migrations[1].source);
+    assert.doesNotThrow(() => database.exec(migrations[2].source));
     assert.equal(
       database.prepare("SELECT event_count FROM privacy_event_daily").get().event_count,
       1,
       "applying tracked migrations after bootstrap must preserve aggregate rows",
+    );
+    assert.equal(
+      database.prepare("SELECT web_version FROM deployment_smoke").get().web_version,
+      "pausesure-web-6.3.1",
+      "the content-free deployment marker must survive tracked migration application",
     );
   } finally {
     database.close();
