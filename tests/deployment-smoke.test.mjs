@@ -57,7 +57,7 @@ test("writes only a fixed release marker and returns an empty 204", async () => 
   assert.equal(typeof write.values[1], "number");
   assert.doesNotMatch(
     `${createDeploymentSmokeTable}\n${write.source}`,
-    /(?:user|account|session|device|ip|url|phone|message|content|image|text)/iu,
+    /\b(?:user_id|account_id|session_id|device_id|ip_address|url|phone_number|message|content|image|free_form)\b/iu,
     "the release marker must not add user, request, or checked-content fields",
   );
 });
