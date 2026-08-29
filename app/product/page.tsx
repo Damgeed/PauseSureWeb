@@ -4,16 +4,17 @@ import { Arrow, ReleaseBanner, SiteFooter, SiteHeader, StaticImage } from "../si
 
 export const metadata = pageMetadata({
   title: "Product",
-  description: "Explore PauseSure's decision-support tools for suspicious messages, links, QR codes, screenshots, after-call evidence, protection setup, and trusted support.",
+  description: "Explore PauseSure's decision-support tools for suspicious messages, links, phone numbers, QR codes, screenshots, after-call evidence, protection setup, and trusted support.",
   path: "/product",
 });
 
 const inputs = [
   ["Message", "Paste a text or email, review pressure, impersonation, payment, and secrecy signals, and check each bounded web address without sending the surrounding message."],
   ["Link", "Inspect the address structure, check the bounded address against Google Web Risk, and verify high-impact requests through an official channel you find independently."],
+  ["Phone number", "Check whether the format is complete and get a clear reminder that caller ID can be spoofed. PauseSure does not claim licensed caller reputation until that data source is connected."],
   ["Screenshot", "Select a supported screenshot for server text recognition, then run the extracted evidence through the same shared PauseSure fraud engine and Google Web Risk checks used for other inputs. Pasted wording remains available as a fallback."],
   ["QR code", "Read a code before following it, then separate the destination from the story around it."],
-  ["Audio or voicemail", "Import a supported file you select and review its transcript in the same calm workflow. PauseSure does not record live cellular calls."],
+  ["Audio or voicemail", "In the iPhone app, import a supported file you select and review its transcript in the same calm workflow. PauseSure does not record live cellular calls."],
   ["Protection setup", "Review the iPhone settings and readiness states PauseSure can inspect, with manual checks clearly identified."],
   ["Trusted Circle", "Ask a chosen person for a second opinion without creating a surveillance dashboard."],
 ];
@@ -27,7 +28,7 @@ export default function ProductPage() {
         <div className="page-hero-copy">
           <p className="eyebrow"><span /> Product</p>
           <h1>One calm place to check what feels off.</h1>
-          <p>PauseSure brings suspicious messages, links, screenshots, QR codes, selected after-call evidence, and trusted support into one decision process—without pretending uncertainty is certainty.</p>
+          <p>PauseSure brings suspicious messages, links, phone numbers, screenshots, QR codes, selected after-call evidence, and trusted support into one decision process—without pretending uncertainty is certainty.</p>
           <div className="hero-actions"><Link className="button button-primary" href="/how-it-works">See how it works <Arrow /></Link><Link className="button button-secondary" href="/safety">Safety by design</Link></div>
         </div>
         <div className="decision-console" aria-label="Example PauseSure review">
@@ -40,7 +41,7 @@ export default function ProductPage() {
       </section>
 
       <section className="metric-band">
-        <div><strong>5</strong><span>check formats in one flow</span></div><div><strong>1</strong><span>consistent action language</span></div><div><strong>0</strong><span>advertising or data selling</span></div><div><strong>You</strong><span>control what gets shared</span></div>
+        <div><strong>6</strong><span>check formats across web and iPhone</span></div><div><strong>1</strong><span>consistent action language</span></div><div><strong>0</strong><span>advertising or data selling</span></div><div><strong>You</strong><span>control what gets shared</span></div>
       </section>
 
       <section className="section page-section">

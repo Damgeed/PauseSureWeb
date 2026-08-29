@@ -4,12 +4,35 @@ const canonicalOrigin = "https://pausesure.com";
 const analysisOrigin = "https://pausesure-production.up.railway.app";
 const analysisEndpoint = `${analysisOrigin}/v1/analysis/check`;
 const imageAnalysisEndpoint = `${analysisOrigin}/v1/analysis/check-image`;
+const expectedWebVersion = "pausesure-web-6.3.0";
+const expectedEngineVersion = "pausesure-rules-6.3.0";
 const requestTimeoutMilliseconds = 20_000;
+const propagationAttempts = 12;
+const propagationDelayMilliseconds = 5_000;
 const benignScreenshotBase64 = "iVBORw0KGgoAAAANSUhEUgAAAKAAAAAwCAAAAACzwi6yAAACtElEQVRYw+2YTUhUYRSGn6v5AzphTKHjT40krhwNTXPCwMQgiIhKo0LJ8gfT7GcRChmBhotoIVTQIkIjKIkMghbtKiIzXUTQwkrSUTPJEMShcdQ5LWauOmrdLg6MxD2b+33n3Pech4/7fourCGs7QoINYAAagMEGMAANwGADGIAGYLABDEADUKPeoVz2rcKS/QqlyjSlyvQKkrYtUf3q+qCi0X9X0ioB9cf3Ss+FmMC1Czzg59nzV83q5s7watutCzigh2h16YwyL6+7w3W103mCcy12U3Ld6OLU5NkM0/b6X+q2NJ9qpY+Tltk6032KFT9R5Yah3ZERtrsAn4qSEo8MBBjQXXBp9rj1Zq5jITWWecN0TK7lTPn2VQ2caLMAZzr225aJZvYNnKtylD+GruzOlIK39iHNmfL3eEh6mTcUq0grzSLSzmGRElxSgktqaBWReppUxQtui0hZqG1cRIrwE1VgmxB5zVGRnJAnIpN5JGoAaAPOh1Vkc8qciIg93KkCusPTPCLiiotfAkiH+AAXiSq82ehC6aVYROSdJqC2SRqbvc8wcDrsDwAi3f02X3XQna8AETs7nVH+ukzf01+UBRAJfewFyN6kNV6Xiwfp6vKu1C+OEeIAsDCS6v9y7IqiGF92lHgAEn9ozNRlklhqfQdvV1PxjAEwhuUPnVcQAUl4r4IJrZm6AM3mbgCuX5lPWcNeAri74kz/LgJSeQ7w1YFG6LtmqntbgHsXv8xnwk59uAU0jZzWIQK25T56Cq46j+ZMTRc3qnayikymkVVzIDRheOGa+WYlv2YH6VNLXTyluniRqIJxEZGNhSJv1ofsKd8anaflYn0naOqpl7aPVT0JCynL+9qf7TMN3VF6RIC951Dfs4xXaVojFeP/oAFoABqABuDaDgPQAAx2GID/PeBvJxkFuZNQxVIAAAAASUVORK5CYII=";
 
 async function request(url, init = {}, timeoutMilliseconds = requestTimeoutMilliseconds) {
   const signal = AbortSignal.timeout(timeoutMilliseconds);
   return fetch(url, { ...init, signal });
+}
+
+function wait(milliseconds) {
+  return new Promise((resolve) => setTimeout(resolve, milliseconds));
+}
+
+async function retryForPropagation(label, operation) {
+  let lastError;
+  for (let attempt = 1; attempt <= propagationAttempts; attempt += 1) {
+    try {
+      return await operation();
+    } catch (error) {
+      lastError = error;
+      if (attempt === propagationAttempts) break;
+      console.log(`${label} is not active yet (attempt ${attempt}/${propagationAttempts}); retrying in ${propagationDelayMilliseconds / 1000}s.`);
+      await wait(propagationDelayMilliseconds);
+    }
+  }
+  throw lastError;
 }
 
 function assertIncludesToken(value, token, header) {
@@ -30,7 +53,7 @@ function verifyHtmlHeaders(response) {
   assert.equal(response.headers.get("cross-origin-opener-policy"), "same-origin");
   assert.equal(response.headers.get("x-content-type-options"), "nosniff");
   assert.equal(response.headers.get("x-frame-options"), "DENY");
-  assert.equal(response.headers.get("x-pausesure-web-version"), "pausesure-web-6.3.0");
+  assert.equal(response.headers.get("x-pausesure-web-version"), expectedWebVersion);
   assertIncludesToken(response.headers.get("cache-control") ?? "", "private", "Cache-Control");
   assertIncludesToken(response.headers.get("cache-control") ?? "", "no-store", "Cache-Control");
 
@@ -93,6 +116,22 @@ async function verifySite() {
   await verifyCheckerBundle(html);
 }
 
+async function verifyD1Write() {
+  const response = await request(`${canonicalOrigin}/api/deployment-smoke`, {
+    method: "POST",
+    redirect: "error",
+    referrerPolicy: "no-referrer",
+    headers: {
+      origin: canonicalOrigin,
+      "x-pausesure-release-version": expectedWebVersion,
+    },
+  });
+  assert.equal(response.status, 204, "the content-free D1 deployment smoke must return 204");
+  assert.equal(response.headers.get("x-pausesure-web-version"), expectedWebVersion);
+  assertIncludesToken(response.headers.get("cache-control") ?? "", "no-store", "Cache-Control");
+  assert.equal(await response.text(), "", "the deployment smoke must not return database details");
+}
+
 async function verifyBackend() {
   for (const [path, expectedStatus] of [["/health/live", "ok"], ["/health/ready", "ready"]]) {
     const response = await request(`${analysisOrigin}${path}`, { redirect: "error" });
@@ -119,7 +158,7 @@ async function verifyBackend() {
   assertIncludesToken(imageResponse.headers.get("cache-control") ?? "", "no-store", "Cache-Control");
   const imageResult = await imageResponse.json();
   assert.equal(imageResult.schemaVersion, 1);
-  assert.equal(imageResult.engineVersion, "pausesure-rules-6.3.0");
+  assert.equal(imageResult.engineVersion, expectedEngineVersion);
   assert.equal(imageResult.kind, "screenshot");
   assert.deepEqual(imageResult.reputation, [], "the benign OCR smoke must not perform another Web Risk lookup");
 
@@ -142,7 +181,7 @@ async function verifyBackend() {
 
   const result = await response.json();
   assert.equal(result.schemaVersion, 1);
-  assert.equal(result.engineVersion, "pausesure-rules-6.3.0");
+  assert.equal(result.engineVersion, expectedEngineVersion);
   assert.equal(result.kind, "link");
   const evidence = result.reputation?.find((item) => item?.source?.id === "google_web_risk");
   assert.ok(evidence, "Google Web Risk evidence is required");
@@ -152,9 +191,10 @@ async function verifyBackend() {
 }
 
 try {
-  await verifySite();
+  await retryForPropagation("PauseSure web release", verifySite);
+  await retryForPropagation("PauseSure D1 release write", verifyD1Write);
   await verifyBackend();
-  console.log("PauseSure production smoke passed: HTTPS/CSP, shared checker, backend 6.3, server OCR, and Google Web Risk are live.");
+  console.log("PauseSure production smoke passed: HTTPS/CSP, web 6.3, D1, backend 6.3, server OCR, and Google Web Risk are live.");
 } catch (error) {
   console.error(`PauseSure production smoke failed: ${error instanceof Error ? error.message : "unknown failure"}`);
   process.exitCode = 1;

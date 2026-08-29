@@ -1,1 +1,0 @@
-Trigger Cloudflare Git build after expanding GitHub App repository access.

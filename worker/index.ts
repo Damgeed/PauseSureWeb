@@ -1,11 +1,19 @@
 /** Cloudflare Worker entry point for PauseSure. */
 import handler from "vinext/server/app-router-entry";
-import { deleteExpiredPrivacyEvents, handlePrivacyEvents, type PrivacyEventEnv } from "./privacy-events";
+import {
+  handleDeploymentSmoke,
+  type DeploymentSmokeEnv,
+} from "./deployment-smoke";
+import {
+  deleteExpiredPrivacyEvents,
+  handlePrivacyEvents,
+  type PrivacyEventEnv,
+} from "./privacy-events";
 
 const canonicalOrigin = "https://pausesure.com";
 const webReleaseVersion = "pausesure-web-6.3.0";
 
-interface Env extends PrivacyEventEnv {
+interface Env extends PrivacyEventEnv, DeploymentSmokeEnv {
   ASSETS: Fetcher;
 }
 
@@ -94,6 +102,13 @@ const worker = {
     }
 
     try {
+      if (url.pathname === "/api/deployment-smoke") {
+        return withSecurityHeaders(
+          await handleDeploymentSmoke(request, env, webReleaseVersion),
+          nonce,
+        );
+      }
+
       if (url.pathname === "/api/privacy-events") {
         return withSecurityHeaders(await handlePrivacyEvents(request, env), nonce);
       }

@@ -53,9 +53,9 @@ export const releaseMessaging = hasVerifiedAppStoreListing
       eyebrow: "Use PauseSure now",
       headline: "A calmer way to handle suspicious requests.",
       summary:
-        "Check a message, link, phone number, screenshot, or QR code through one shared analysis engine and get explainable warning signals, configured destination intelligence, and practical next steps.",
+        "Check a message, link, phone number, screenshot, or QR code and get clear warning signs, practical next steps, and a reminder to verify independently.",
       availability:
-        "The PauseSure web checker is ready on pausesure.com. Screenshot OCR and manually submitted evidence use the same production engine, and valid web addresses can be checked through configured Google Web Risk intelligence without opening the destination.",
+        "The PauseSure web checker is ready on pausesure.com. It can read submitted screenshots securely and compare valid web addresses with Google Web Risk without opening the destination.",
       statusLabel: "Available now",
       statusValue: "PauseSure web checker",
       footer: "Pause. Check. Verify. Involve. Recover.",
