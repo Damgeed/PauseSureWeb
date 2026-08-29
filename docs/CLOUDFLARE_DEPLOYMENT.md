@@ -1,6 +1,6 @@
 # PauseSureWeb production deployment
 
-PauseSureWeb is deployed to the Cloudflare Worker `pausesure-web` from GitHub Actions. Cloudflare's repository-build connection is optional and is not the production authority. A commit reaches production only after the `Web CI` workflow succeeds on `main`; the `Deploy Cloudflare` workflow then checks out that exact reviewed commit, applies D1 migrations, builds, publishes, and runs the production smoke suite.
+PauseSureWeb is deployed to the Cloudflare Worker `pausesure-web` from GitHub Actions. Cloudflare's repository-build connection is optional and is not the production authority. Automatic releases require a successful `Web CI` run on `main`; a main-only manual dispatch repeats the same security and source verification gates. `Deploy Cloudflare` then applies D1 migrations, builds, publishes, and runs the production smoke suite.
 
 ## Production resources
 
@@ -63,13 +63,13 @@ npm run deploy:built
 npm run smoke:production
 ```
 
-`deploy:built` publishes already-built output and does not repeat the complete audit, lint, typecheck, test, and dry-run suite. Manual deployments remain guarded through `npm run deploy`, which runs `npm run verify` before publishing.
+`deploy:built` publishes already-built output and does not repeat the complete audit, lint, typecheck, test, and dry-run suite. A manual GitHub Actions dispatch is accepted only from `main`; it repeats the dependency-signature audit and `npm run verify` before migration or publishing. Local manual deployments remain guarded through `npm run deploy`, which runs `npm run verify` before publishing.
 
 ## D1 migrations
 
 Migrations live in `drizzle/` and are applied before the Worker is published. They must be additive or remain compatible with the previous Worker version so Cloudflare rollback remains safe.
 
-The Worker defensively creates the privacy-aggregate and deployment-smoke tables when a new binding is empty. Checked-in migrations remain authoritative because Wrangler records migration history and gives later schema changes a reviewable order.
+Checked-in migrations are the only schema authority. The deployment applies them before publishing the Worker; request and scheduled handlers never issue DDL. A missing or out-of-date schema therefore fails closed instead of creating an unreviewed runtime schema.
 
 The production smoke writes only one fixed operational row to `deployment_smoke`:
 

@@ -278,9 +278,7 @@ test("accepts only same-origin, allowlisted, content-free analytics", async () =
     body: JSON.stringify(validBody),
   }), env, ctx);
   assert.equal(valid.status, 204);
-  assert.equal(schemaExecutes.length, 1, "the final constrained aggregate table should initialize once per D1 binding");
-  assert.match(schemaExecutes[0], /^\s*CREATE TABLE IF NOT EXISTS privacy_event_daily/u);
-  assert.match(schemaExecutes[0], /event_count INTEGER NOT NULL CHECK/u);
+  assert.equal(schemaExecutes.length, 0, "analytics requests must never perform runtime DDL");
   assert.equal(batches.length, 1);
   assert.equal(batches[0].length, 1, "only aggregate upserts should run in the request path");
   assert.ok(batches[0][0].values.every((value) => !String(value).includes("http")), "aggregate values should contain no checked URL");
@@ -421,8 +419,7 @@ test("accepts only same-origin, allowlisted, content-free analytics", async () =
   assert.deepEqual(await failedDatabase.json(), { error: "Request could not be completed." });
   assert.deepEqual(logged, [["[PauseSure] Request handling failed."]]);
 
-  assert.equal(schemaExecutes.length, 3, "each distinct D1 binding should initialize at most once");
-  assert.ok(schemaExecutes.every((sql) => /^\s*CREATE TABLE IF NOT EXISTS privacy_event_daily/u.test(sql)));
+  assert.equal(schemaExecutes.length, 0, "migrations must remain the only schema authority across D1 bindings");
   assert.equal(runs.length, 0, "retention cleanup must not run in a user request");
 });
 
@@ -451,8 +448,7 @@ test("runs aggregate retention cleanup from the daily scheduled handler", async 
   });
   await Promise.all(scheduledWork);
 
-  assert.equal(schemaExecutes.length, 1);
-  assert.match(schemaExecutes[0], /^\s*CREATE TABLE IF NOT EXISTS privacy_event_daily/u);
+  assert.equal(schemaExecutes.length, 0, "scheduled retention must never perform runtime DDL");
   assert.equal(runs.length, 1);
   assert.match(runs[0].sql, /^DELETE FROM privacy_event_daily WHERE day <= \?$/);
   assert.match(runs[0].values[0], /^\d{4}-\d{2}-\d{2}$/);

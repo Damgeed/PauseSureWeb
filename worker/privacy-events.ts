@@ -14,71 +14,6 @@ const eventSchemas = {
   next_action_selected: { action: actionValues, risk: riskValues, channel: channelValues },
 } as const;
 
-export const createPrivacyEventTable = `
-  CREATE TABLE IF NOT EXISTS privacy_event_daily (
-    day TEXT NOT NULL CHECK (
-      length(day) = 10
-      AND day GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'
-      AND date(day, '+0 days') = day
-    ),
-    event_name TEXT NOT NULL CHECK (event_name IN (
-      'web_check_started',
-      'web_check_completed',
-      'result_viewed',
-      'next_action_selected'
-    )),
-    input_kind TEXT NOT NULL CHECK (input_kind IN (
-      'none', 'text', 'link', 'screenshot', 'qr', 'phone'
-    )),
-    risk TEXT NOT NULL CHECK (risk IN (
-      'none', 'high', 'unclear', 'insufficient'
-    )),
-    action TEXT NOT NULL CHECK (action IN (
-      'none', 'verify', 'recover'
-    )),
-    channel TEXT NOT NULL CHECK (channel = 'web'),
-    event_count INTEGER NOT NULL CHECK (event_count BETWEEN 1 AND 9007199254740991),
-    updated_at INTEGER NOT NULL CHECK (updated_at > 0),
-    CHECK (
-      (
-        event_name = 'web_check_started'
-        AND input_kind <> 'none'
-        AND risk = 'none'
-        AND action = 'none'
-      )
-      OR (
-        event_name IN ('web_check_completed', 'result_viewed')
-        AND input_kind <> 'none'
-        AND risk <> 'none'
-        AND action = 'none'
-      )
-      OR (
-        event_name = 'next_action_selected'
-        AND input_kind = 'none'
-        AND risk <> 'none'
-        AND action <> 'none'
-      )
-    ),
-    PRIMARY KEY(day, event_name, input_kind, risk, action, channel)
-  )
-`;
-
-const schemaInitializationByDatabase = new WeakMap<D1Database, Promise<void>>();
-
-async function ensurePrivacyEventTable(database: D1Database) {
-  let initialization = schemaInitializationByDatabase.get(database);
-  if (!initialization) {
-    initialization = database.exec(createPrivacyEventTable)
-      .then(() => undefined)
-      .catch((error) => {
-        schemaInitializationByDatabase.delete(database);
-        throw error;
-      });
-    schemaInitializationByDatabase.set(database, initialization);
-  }
-  await initialization;
-}
-
 type EventName = keyof typeof eventSchemas;
 
 export interface PrivacyEventEnv {
@@ -235,7 +170,6 @@ function retentionCutoff(now: Date) {
 
 export async function deleteExpiredPrivacyEvents(env: PrivacyEventEnv, now = new Date()) {
   if (!env.DB) throw new Error("Analytics retention cleanup could not be completed.");
-  await ensurePrivacyEventTable(env.DB);
   await env.DB.prepare("DELETE FROM privacy_event_daily WHERE day <= ?").bind(retentionCutoff(now)).run();
 }
 
@@ -296,7 +230,6 @@ export async function handlePrivacyEvents(request: Request, env: PrivacyEventEnv
     return jsonError("Event contains unsupported or identifying fields.", 400);
   }
   if (!env.DB) return jsonError("Analytics request could not be completed.", 503);
-  await ensurePrivacyEventTable(env.DB);
 
   const statements: D1PreparedStatement[] = [];
   for (const event of events as EventBody[]) {
