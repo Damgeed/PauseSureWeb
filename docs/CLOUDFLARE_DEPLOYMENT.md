@@ -10,7 +10,8 @@ PauseSureWeb is deployed to the Cloudflare Worker `pausesure-web` from GitHub Ac
 - D1 binding: `DB`
 - D1 database: `pausesure-web-analytics`
 - Static-assets binding: `ASSETS`
-- Rate-limit binding: `ANALYTICS_RATE_LIMITER`
+- Product-analytics rate limit: `ANALYTICS_RATE_LIMITER`
+- Low-volume release-smoke rate limit: `DEPLOYMENT_RATE_LIMITER`
 - Daily aggregate-retention cleanup cron
 
 The Worker redirects HTTP and `www.pausesure.com` to the canonical HTTPS origin while preserving the path and query string.
@@ -78,7 +79,7 @@ web_version = pausesure-web-6.3.0
 checked_at = Unix timestamp
 ```
 
-It contains no check content, URL, phone number, image, user, account, session, device, or IP field. The public route accepts only a body-free, canonical-origin POST carrying the current release version and returns an empty `204` without database details.
+It contains no check content, URL, phone number, image, user, account, session, device, or IP field. The route accepts only a body-free, canonical-origin POST carrying the current release version and returns an empty `204` without database details. A dedicated global edge binding limits this operational route to five attempts per minute before any D1 work, independently of the per-client product-analytics limiter.
 
 ## Production verification
 
@@ -88,7 +89,7 @@ It contains no check content, URL, phone number, image, user, account, session, 
 - HTTPS, CSP, nonces, HSTS, clickjacking, MIME, and cache protections;
 - the active `X-PauseSure-Web-Version` header;
 - the deployed browser bundle uses both shared Railway analysis endpoints;
-- a real, content-free D1 write returns `204`;
+- a real, rate-limited, content-free D1 write returns `204`;
 - Railway live and ready health checks pass;
 - the screenshot endpoint accepts a bounded benign PNG and returns engine `pausesure-rules-6.3.0`;
 - the separate Google Web Risk lookup returns valid evidence.
@@ -101,6 +102,7 @@ Keep these bindings on `pausesure-web`:
 
 - `DB → pausesure-web-analytics`
 - `ANALYTICS_RATE_LIMITER`
+- `DEPLOYMENT_RATE_LIMITER`
 - `ASSETS`
 
 Keep `workers_dev` and preview URLs disabled for production. A future preview environment must use separate bindings and access controls so it cannot write to production D1.
