@@ -20,7 +20,7 @@ test("renders the public multi-page company site", async () => {
     assert.match(response.headers.get("content-type") ?? "", /^text\/html\b/i);
     assert.equal(response.headers.get("x-content-type-options"), "nosniff");
     assert.equal(response.headers.get("x-frame-options"), "DENY");
-    assert.equal(response.headers.get("x-pausesure-web-version"), "pausesure-web-6.3.0");
+    assert.equal(response.headers.get("x-pausesure-web-version"), "pausesure-web-6.3.1");
     assert.equal(response.headers.get("referrer-policy"), "strict-origin-when-cross-origin");
     assert.match(response.headers.get("permissions-policy") ?? "", /camera=\(\)/);
     const csp = response.headers.get("content-security-policy") ?? "";
