@@ -27,6 +27,28 @@ test("uses a first-party Cloudflare Workers configuration", async () => {
   assert.doesNotMatch(source, /(?:OpenAI|ChatGPT|site-creator)/i);
 });
 
+test("deploys only a CI-approved main commit without repeating the full verification suite", async () => {
+  const workflow = await readFile(new URL("../.github/workflows/deploy-cloudflare.yml", import.meta.url), "utf8");
+  const packageJson = JSON.parse(await readFile(new URL("../package.json", import.meta.url), "utf8"));
+
+  assert.match(workflow, /workflow_run:/u);
+  assert.match(workflow, /workflows:\s*\["Web CI"\]/u);
+  assert.match(workflow, /types:\s*\[completed\]/u);
+  assert.match(workflow, /branches:\s*\[main\]/u);
+  assert.match(workflow, /workflow_run\.conclusion == 'success'/u);
+  assert.match(workflow, /workflow_run\.head_branch == 'main'/u);
+  assert.match(workflow, /workflow_run\.head_sha/u, "the deployment must publish the exact CI-reviewed commit");
+  assert.match(workflow, /CLOUDFLARE_API_TOKEN:\s*\$\{\{ secrets\.CLOUDFLARE_API_TOKEN \}\}/u);
+  assert.match(workflow, /CLOUDFLARE_ACCOUNT_ID:\s*\$\{\{ secrets\.CLOUDFLARE_ACCOUNT_ID \}\}/u);
+  assert.match(workflow, /npm run db:migrate:remote/u);
+  assert.match(workflow, /npm run build/u);
+  assert.match(workflow, /npm run deploy:built/u);
+  assert.match(workflow, /npm run smoke:production/u);
+  assert.doesNotMatch(workflow, /npm run verify/u, "Web CI is the verification authority; deployment must not run the same suite twice");
+  assert.equal(packageJson.scripts["deploy:built"], "wrangler deploy");
+  assert.equal(packageJson.scripts.deploy, "npm run verify && npm run deploy:built");
+});
+
 test("does not package hosting-control-plane metadata", async () => {
   await assert.rejects(access(new URL("../dist/.openai", import.meta.url)));
 });
@@ -36,6 +58,7 @@ test("keeps raw SQL migrations without dead ORM or starter code", async () => {
   assert.equal(packageJson.dependencies?.["drizzle-orm"], undefined);
   assert.equal(packageJson.devDependencies?.["drizzle-kit"], undefined);
   await readFile(new URL("../drizzle/0000_famous_chamber.sql", import.meta.url), "utf8");
+  await readFile(new URL("../drizzle/0002_deployment_smoke.sql", import.meta.url), "utf8");
   for (const path of ["../drizzle.config.ts", "../db/index.ts", "../db/schema.ts", "../examples/d1/app/api/notes/route.ts"]) {
     await assert.rejects(access(new URL(path, import.meta.url)), `${path} should stay removed`);
   }
@@ -57,7 +80,7 @@ test("redirects every production HTTP and www request to the fixed HTTPS origin"
     assert.equal(response.status, 308);
     assert.equal(response.headers.get("location"), expectedLocation);
     assert.equal(response.headers.get("x-content-type-options"), "nosniff");
-    assert.equal(response.headers.get("x-pausesure-web-version"), "pausesure-web-6.3.0");
+    assert.equal(response.headers.get("x-pausesure-web-version"), "pausesure-web-6.3.1");
     assert.match(response.headers.get("content-security-policy") ?? "", /frame-ancestors 'none'/);
   }
 
