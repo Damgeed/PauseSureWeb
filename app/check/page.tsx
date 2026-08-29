@@ -4,7 +4,7 @@ import CheckerClient from "./checker-client";
 
 export const metadata = pageMetadata({
   title: "Check a suspicious request",
-  description: "A no-account check for suspicious messages, links, phone numbers, screenshots and QR destinations.",
+  description: "A no-account check for suspicious messages, links, phone numbers, screenshots and QR destinations using PauseSure's shared analysis engine.",
   path: "/check",
 });
 
@@ -17,7 +17,7 @@ export default function CheckPage() {
     </section>
     <CheckerClient />
     <section className="checker-boundary" aria-label="Checker limitations">
-      <div><strong>What this covers</strong><p>Explain language and link-structure signals, decode supported QR images, check bounded valid addresses against configured threat intelligence, and give practical next steps.</p></div>
+      <div><strong>What this covers</strong><p>Recognize screenshot text through protected server OCR, explain language and link-structure signals through the shared PauseSure engine, decode supported QR images, check bounded valid addresses through Google Web Risk, and give practical next steps.</p></div>
       <div><strong>Decision boundary</strong><p>A missing warning or threat-list match does not prove safety. The threat-list lookup does not open the submitted site or determine whether it currently responds, has been deactivated, or later returns. Verify identity and high-impact requests through an official route you locate independently.</p></div>
       <div><strong>If money or access moved</strong><p>Contact the relevant institution immediately using an official number or app you locate independently.</p></div>
     </section>

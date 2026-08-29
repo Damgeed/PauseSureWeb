@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { readdir, readFile } from "node:fs/promises";
 import { DatabaseSync } from "node:sqlite";
 import test from "node:test";
+import { createPrivacyEventTable } from "../worker/privacy-events.ts";
 
 const migrationDirectory = new URL("../drizzle/", import.meta.url);
 
@@ -111,6 +112,38 @@ test("D1 schema rejects free-form, mismatched, invalid-date, and unsafe-count ro
     ]) {
       assert.throws(() => insert.run(...invalid), /constraint failed/iu);
     }
+  } finally {
+    database.close();
+  }
+});
+
+test("initial migration is safe after defensive Worker bootstrap", async () => {
+  const migrations = await migrationSources();
+  const database = new DatabaseSync(":memory:");
+  try {
+    database.exec(createPrivacyEventTable);
+    database.prepare(`
+      INSERT INTO privacy_event_daily
+        (day, event_name, input_kind, risk, action, channel, event_count, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      "2026-08-28",
+      "web_check_started",
+      "screenshot",
+      "none",
+      "none",
+      "web",
+      1,
+      1_777_000_001,
+    );
+
+    assert.doesNotThrow(() => database.exec(migrations[0].source));
+    database.exec(migrations[1].source);
+    assert.equal(
+      database.prepare("SELECT event_count FROM privacy_event_daily").get().event_count,
+      1,
+      "applying tracked migrations after bootstrap must preserve aggregate rows",
+    );
   } finally {
     database.close();
   }

@@ -6,8 +6,8 @@ export const metadata = pageMetadata({ title: "How It Works", description: "See 
 
 const steps = [
   ["Pause", "Break contact with the pressure before replying, clicking, paying, or sharing."],
-  ["Check", "Bring in only the message, link, screenshot, QR code, or audio you deliberately choose."],
-  ["Understand", "See the specific signals behind the concern, alongside uncertainty and important limitations."],
+  ["Check", "Bring in only the message, link, screenshot, QR code, or audio you deliberately choose. Screenshot text recognition and every supported input feed the same shared analysis contract."],
+  ["Understand", "See the specific rules, structural findings, and Google Web Risk evidence behind the concern, alongside uncertainty and important limitations."],
   ["Verify", "Leave the incoming channel. Find the organization through its official app, card, statement, or known website."],
   ["Decide", "Continue only after independent confirmation—or involve a trusted person and start recovery steps."],
 ];

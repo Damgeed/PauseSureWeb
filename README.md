@@ -64,6 +64,8 @@ Do not add analytics, advertising pixels, form collection, authentication, or th
 
 The reviewed Scam Pulse feed is published at `public/scam-pulse/v1.json`. Every campaign entry must link directly to an HTTPS government source, preserve that source's publication date, and pass the feed contract tests. A missing or stale source is uncertainty, never proof that a threat is absent.
 
+The public screenshot checker sends a normalized, size-bounded JPEG or PNG to the production `/v1/analysis/check-image` route. The service uses Google Cloud Vision for text recognition, then submits the extracted evidence to the same versioned analysis engine and response contract used by other inputs. Eligible extracted web addresses may be checked through Google Web Risk. The selected screenshot and extracted text are not written to PauseSure application data or request logs; pasted wording remains an explicit fallback.
+
 ## Operating documents
 
 - [App ↔ web synchronization](docs/APP_WEB_SYNC.md)

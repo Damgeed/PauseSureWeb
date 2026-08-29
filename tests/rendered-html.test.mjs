@@ -20,7 +20,7 @@ test("renders the public multi-page company site", async () => {
     assert.match(response.headers.get("content-type") ?? "", /^text\/html\b/i);
     assert.equal(response.headers.get("x-content-type-options"), "nosniff");
     assert.equal(response.headers.get("x-frame-options"), "DENY");
-    assert.equal(response.headers.get("x-pausesure-web-version"), "pausesure-web-6.2.0");
+    assert.equal(response.headers.get("x-pausesure-web-version"), "pausesure-web-6.3.0");
     assert.equal(response.headers.get("referrer-policy"), "strict-origin-when-cross-origin");
     assert.match(response.headers.get("permissions-policy") ?? "", /camera=\(\)/);
     const csp = response.headers.get("content-security-policy") ?? "";
@@ -92,8 +92,21 @@ test("renders the public multi-page company site", async () => {
     }
 
     if (route === "/privacy") {
-      assert.match(html, /sends the text, phone number, or destination you submit/iu);
+      assert.match(html, /text, phone number, destination, or screenshot you deliberately submit/iu);
+      assert.match(html, /Google Cloud Vision for text recognition/iu);
+      assert.match(html, /does not retain the screenshot or extracted text in application data or request logs/iu);
+      assert.match(html, /Google Cloud processes submitted screenshots for Vision text recognition/iu);
       assert.match(html, /retained for up to 180 days/iu);
+    }
+
+    if (route === "/product") {
+      assert.match(html, /server text recognition/iu);
+      assert.match(html, /same shared PauseSure fraud engine and Google Web Risk checks/iu);
+      assert.match(html, /Pasted wording remains available as a fallback/iu);
+    }
+
+    if (route === "/how-it-works") {
+      assert.match(html, /Screenshot text recognition and every supported input feed the same shared analysis contract/iu);
     }
   }
 
@@ -119,8 +132,25 @@ test("does not grant the renderer nonce to untrusted response scripts", async ()
 test("uses only the canonical production analysis route for checker decisions", async () => {
   const source = await readFile(new URL("../app/check/checker-client.tsx", import.meta.url), "utf8");
   assert.match(source, /\/v1\/analysis\/check/);
+  assert.match(source, /\/v1\/analysis\/check-image/);
+  assert.match(source, /\{ kind: "screenshot", image \}/u, "the image route should use the canonical request envelope");
+  assert.match(source, /parseAnalysisResponse\(responsePayload, expectedKind\)/u, "all routes must use the shared response-contract parser");
+  assert.match(source, /standardAnalysisTimeoutMilliseconds = 15_000/u);
+  assert.match(source, /imageAnalysisTimeoutMilliseconds = 25_000/u);
+  assert.match(source, /controller,\s*imageAnalysisTimeoutMilliseconds,/u, "screenshot OCR should have a bounded timeout that covers the provider chain");
+  assert.match(source, /fetch\(endpoint,/u, "the fixed route selected by the checker must be the route fetched");
   assert.match(source, /redirect:\s*"error"/u, "submitted content must never follow an HTTP redirect");
-  assert.match(source, /response\.url\s*!==\s*analysisEndpoint/u, "the analysis response must come from the fixed endpoint");
+  assert.match(source, /credentials:\s*"omit"/u);
+  assert.match(source, /referrerPolicy:\s*"no-referrer"/u);
+  assert.match(source, /cache:\s*"no-store"/u);
+  assert.match(source, /response\.url\s*!==\s*endpoint/u, "the analysis response must come from the selected fixed endpoint");
+  assert.match(source, /setNormalizedImage\(null\)/u, "clear and mode changes must release prepared image bytes");
+  assert.match(source, /URL\.revokeObjectURL\(imageUrl\)/u, "preview object URLs must be revoked");
+  assert.match(
+    source,
+    /if \(inputKind === "screenshot"\) \{\s*setValue\(""\);\s*setNormalizedImage\(null\);[\s\S]*setImageUrl\(null\);[\s\S]*imageInput\.current\.value = "";/u,
+    "successful screenshot checks must release pasted text, the base64 payload, preview URL, and file input",
+  );
   const sensitiveControlSources = source
     .split("\n")
     .filter((line) => line.includes("id=\"check-content\"") && (line.includes("<input") || line.includes("<textarea")));

@@ -3,10 +3,12 @@ import assert from "node:assert/strict";
 const canonicalOrigin = "https://pausesure.com";
 const analysisOrigin = "https://pausesure-production.up.railway.app";
 const analysisEndpoint = `${analysisOrigin}/v1/analysis/check`;
+const imageAnalysisEndpoint = `${analysisOrigin}/v1/analysis/check-image`;
 const requestTimeoutMilliseconds = 20_000;
+const benignScreenshotBase64 = "iVBORw0KGgoAAAANSUhEUgAAAKAAAAAwCAAAAACzwi6yAAACtElEQVRYw+2YTUhUYRSGn6v5AzphTKHjT40krhwNTXPCwMQgiIhKo0LJ8gfT7GcRChmBhotoIVTQIkIjKIkMghbtKiIzXUTQwkrSUTPJEMShcdQ5LWauOmrdLg6MxD2b+33n3Pech4/7fourCGs7QoINYAAagMEGMAANwGADGIAGYLABDEADUKPeoVz2rcKS/QqlyjSlyvQKkrYtUf3q+qCi0X9X0ioB9cf3Ss+FmMC1Czzg59nzV83q5s7watutCzigh2h16YwyL6+7w3W103mCcy12U3Ld6OLU5NkM0/b6X+q2NJ9qpY+Tltk6032KFT9R5Yah3ZERtrsAn4qSEo8MBBjQXXBp9rj1Zq5jITWWecN0TK7lTPn2VQ2caLMAZzr225aJZvYNnKtylD+GruzOlIK39iHNmfL3eEh6mTcUq0grzSLSzmGRElxSgktqaBWReppUxQtui0hZqG1cRIrwE1VgmxB5zVGRnJAnIpN5JGoAaAPOh1Vkc8qciIg93KkCusPTPCLiiotfAkiH+AAXiSq82ehC6aVYROSdJqC2SRqbvc8wcDrsDwAi3f02X3XQna8AETs7nVH+ukzf01+UBRAJfewFyN6kNV6Xiwfp6vKu1C+OEeIAsDCS6v9y7IqiGF92lHgAEn9ozNRlklhqfQdvV1PxjAEwhuUPnVcQAUl4r4IJrZm6AM3mbgCuX5lPWcNeAri74kz/LgJSeQ7w1YFG6LtmqntbgHsXv8xnwk59uAU0jZzWIQK25T56Cq46j+ZMTRc3qnayikymkVVzIDRheOGa+WYlv2YH6VNLXTyluniRqIJxEZGNhSJv1ofsKd8anaflYn0naOqpl7aPVT0JCynL+9qf7TMN3VF6RIC951Dfs4xXaVojFeP/oAFoABqABuDaDgPQAAx2GID/PeBvJxkFuZNQxVIAAAAASUVORK5CYII=";
 
-async function request(url, init = {}) {
-  const signal = AbortSignal.timeout(requestTimeoutMilliseconds);
+async function request(url, init = {}, timeoutMilliseconds = requestTimeoutMilliseconds) {
+  const signal = AbortSignal.timeout(timeoutMilliseconds);
   return fetch(url, { ...init, signal });
 }
 
@@ -28,7 +30,7 @@ function verifyHtmlHeaders(response) {
   assert.equal(response.headers.get("cross-origin-opener-policy"), "same-origin");
   assert.equal(response.headers.get("x-content-type-options"), "nosniff");
   assert.equal(response.headers.get("x-frame-options"), "DENY");
-  assert.equal(response.headers.get("x-pausesure-web-version"), "pausesure-web-6.2.0");
+  assert.equal(response.headers.get("x-pausesure-web-version"), "pausesure-web-6.3.0");
   assertIncludesToken(response.headers.get("cache-control") ?? "", "private", "Cache-Control");
   assertIncludesToken(response.headers.get("cache-control") ?? "", "no-store", "Cache-Control");
 
@@ -55,12 +57,16 @@ async function verifyCheckerBundle(html) {
     const response = await request(source, { redirect: "error" });
     assert.equal(response.status, 200, `${source} must load`);
     const javascript = await response.text();
-    if (javascript.includes(analysisEndpoint) && javascript.includes("google_web_risk")) {
+    if (
+      javascript.includes(analysisEndpoint)
+      && javascript.includes(imageAnalysisEndpoint)
+      && javascript.includes("google_web_risk")
+    ) {
       sharedCheckerFound = true;
       break;
     }
   }
-  assert.ok(sharedCheckerFound, "The deployed checker bundle must use the shared Railway/Web Risk contract");
+  assert.ok(sharedCheckerFound, "The deployed checker bundle must use the shared Railway OCR/Web Risk contract");
 }
 
 function verifyExecutableScriptNonces(html, expectedNonce) {
@@ -94,6 +100,29 @@ async function verifyBackend() {
     assert.equal((await response.json()).status, expectedStatus);
   }
 
+  const imageResponse = await request(imageAnalysisEndpoint, {
+    method: "POST",
+    redirect: "error",
+    referrerPolicy: "no-referrer",
+    headers: {
+      "content-type": "application/json",
+      origin: canonicalOrigin,
+    },
+    body: JSON.stringify({
+      kind: "screenshot",
+      image: { mediaType: "image/png", dataBase64: benignScreenshotBase64 },
+    }),
+  }, 30_000);
+  assert.equal(imageResponse.status, 200, "the screenshot OCR route must accept a bounded benign PNG");
+  assert.equal(imageResponse.headers.get("access-control-allow-origin"), canonicalOrigin);
+  assertIncludesToken(imageResponse.headers.get("cache-control") ?? "", "private", "Cache-Control");
+  assertIncludesToken(imageResponse.headers.get("cache-control") ?? "", "no-store", "Cache-Control");
+  const imageResult = await imageResponse.json();
+  assert.equal(imageResult.schemaVersion, 1);
+  assert.equal(imageResult.engineVersion, "pausesure-rules-6.3.0");
+  assert.equal(imageResult.kind, "screenshot");
+  assert.deepEqual(imageResult.reputation, [], "the benign OCR smoke must not perform another Web Risk lookup");
+
   // This is the only reputation lookup performed by this smoke run.
   const uniqueBenignUrl = `https://www.google.com/?pausesure-release-smoke=${Date.now()}-${crypto.randomUUID()}`;
   const response = await request(analysisEndpoint, {
@@ -113,7 +142,7 @@ async function verifyBackend() {
 
   const result = await response.json();
   assert.equal(result.schemaVersion, 1);
-  assert.equal(result.engineVersion, "pausesure-rules-6.2.0");
+  assert.equal(result.engineVersion, "pausesure-rules-6.3.0");
   assert.equal(result.kind, "link");
   const evidence = result.reputation?.find((item) => item?.source?.id === "google_web_risk");
   assert.ok(evidence, "Google Web Risk evidence is required");
@@ -125,7 +154,7 @@ async function verifyBackend() {
 try {
   await verifySite();
   await verifyBackend();
-  console.log("PauseSure production smoke passed: HTTPS/CSP, shared checker, backend 6.2, and Google Web Risk are live.");
+  console.log("PauseSure production smoke passed: HTTPS/CSP, shared checker, backend 6.3, server OCR, and Google Web Risk are live.");
 } catch (error) {
   console.error(`PauseSure production smoke failed: ${error instanceof Error ? error.message : "unknown failure"}`);
   process.exitCode = 1;

@@ -68,8 +68,11 @@ hostnames.
 
 The Worker defensively initializes the final constrained aggregate table when a
 newly provisioned binding is empty, so the public endpoint does not depend on a
-dashboard race. Still apply the checked-in migrations to preserve Cloudflare's
-migration history and make later schema changes explicit.
+dashboard race. The preferred order is to apply the checked-in migrations before
+promoting the Worker or allowing analytics traffic, which preserves Cloudflare's
+migration history and makes later schema changes explicit. The initial migration
+is idempotent, so it can also record the migration safely if defensive bootstrap
+already created the table.
 
 Use the repository-pinned Wrangler version from a trusted local clone. Wrangler
 4.102.0 fixed remote D1 commands for databases created by automatic
