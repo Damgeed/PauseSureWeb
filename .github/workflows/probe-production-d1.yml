@@ -1,0 +1,65 @@
+name: Probe production D1
+
+on:
+  push:
+    branches: [ops/probe-production-d1-20260829]
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22.13.0
+      - name: Probe deployment and aggregate analytics writes
+        run: |
+          node --input-type=module <<'NODE'
+          const origin = "https://pausesure.com";
+
+          async function probe(name, url, init) {
+            const response = await fetch(url, {
+              ...init,
+              redirect: "error",
+              signal: AbortSignal.timeout(20_000),
+            });
+            const body = (await response.text()).slice(0, 512);
+            console.log(JSON.stringify({
+              name,
+              status: response.status,
+              cacheControl: response.headers.get("cache-control"),
+              version: response.headers.get("x-pausesure-web-version"),
+              retryAfter: response.headers.get("retry-after"),
+              body,
+            }));
+          }
+
+          await probe("deployment-smoke", `${origin}/api/deployment-smoke`, {
+            method: "POST",
+            headers: {
+              origin,
+              "x-pausesure-release-version": "pausesure-web-6.3.0",
+            },
+          });
+
+          const day = new Date().toISOString().slice(0, 10);
+          await probe("privacy-events", `${origin}/api/privacy-events`, {
+            method: "POST",
+            headers: {
+              origin,
+              "content-type": "application/json; charset=utf-8",
+            },
+            body: JSON.stringify({
+              events: [{
+                schemaVersion: 1,
+                name: "web_check_started",
+                day,
+                count: 1,
+                dimensions: { input: "phone", channel: "web" },
+              }],
+            }),
+          });
+          NODE
