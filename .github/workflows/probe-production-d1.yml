@@ -10,10 +10,11 @@ permissions:
 jobs:
   probe:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 12
     env:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      PROBE_WORKER_NAME: pausesure-web-runtime-probe
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -69,7 +70,37 @@ jobs:
             throw new Error("Direct production D1 write/readback failed");
           }
           NODE
-      - name: Probe deployment and aggregate analytics writes
+      - name: Deploy isolated runtime binding probe
+        run: npx wrangler deploy --config wrangler.runtime-probe.jsonc
+      - name: Probe isolated D1 and rate-limit runtime bindings
+        run: |
+          set -euo pipefail
+          curl --fail --show-error --silent \
+            "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/subdomain" \
+            -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+            > "$RUNNER_TEMP/workers-subdomain.json"
+          node --input-type=module <<'NODE'
+          import { readFile } from "node:fs/promises";
+          const response = JSON.parse(await readFile(`${process.env.RUNNER_TEMP}/workers-subdomain.json`, "utf8"));
+          if (response.success !== true || !/^[a-z0-9-]+$/u.test(response.result?.subdomain ?? "")) {
+            throw new Error("Could not resolve the account workers.dev subdomain");
+          }
+          const origin = `https://${process.env.PROBE_WORKER_NAME}.${response.result.subdomain}.workers.dev`;
+          console.log(JSON.stringify({ probeOrigin: origin }));
+
+          for (const path of ["/d1", "/rate-analytics", "/rate-deployment"]) {
+            const result = await fetch(`${origin}${path}`, {
+              redirect: "error",
+              signal: AbortSignal.timeout(20_000),
+            });
+            const body = await result.text();
+            console.log(JSON.stringify({ path, status: result.status, body }));
+            if (result.status !== 200) {
+              throw new Error(`Runtime binding probe failed for ${path}: ${body}`);
+            }
+          }
+          NODE
+      - name: Probe production routes
         run: |
           node --input-type=module <<'NODE'
           const origin = "https://pausesure.com";
@@ -117,3 +148,11 @@ jobs:
             }),
           });
           NODE
+      - name: Delete isolated runtime binding probe
+        if: always()
+        run: |
+          curl --fail --show-error --silent \
+            -X DELETE \
+            "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/scripts/$PROBE_WORKER_NAME?force=true" \
+            -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+            > /dev/null
