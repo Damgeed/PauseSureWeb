@@ -4,7 +4,7 @@ const canonicalOrigin = "https://pausesure.com";
 const analysisOrigin = "https://pausesure-production.up.railway.app";
 const analysisEndpoint = `${analysisOrigin}/v1/analysis/check`;
 const imageAnalysisEndpoint = `${analysisOrigin}/v1/analysis/check-image`;
-const expectedWebVersion = "pausesure-web-6.3.0";
+const expectedWebVersion = "pausesure-web-6.3.1";
 const expectedEngineVersion = "pausesure-rules-6.3.0";
 const requestTimeoutMilliseconds = 20_000;
 const propagationAttempts = 12;
@@ -126,7 +126,12 @@ async function verifyD1Write() {
       "x-pausesure-release-version": expectedWebVersion,
     },
   });
-  assert.equal(response.status, 204, "the content-free D1 deployment smoke must return 204");
+  const releasePhase = response.headers.get("x-pausesure-release-phase") ?? "none";
+  assert.equal(
+    response.status,
+    204,
+    `the content-free D1 deployment smoke must return 204 (failed phase: ${releasePhase})`,
+  );
   assert.equal(response.headers.get("x-pausesure-web-version"), expectedWebVersion);
   assertIncludesToken(response.headers.get("cache-control") ?? "", "no-store", "Cache-Control");
   assert.equal(await response.text(), "", "the deployment smoke must not return database details");
