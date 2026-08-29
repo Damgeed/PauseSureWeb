@@ -30,14 +30,16 @@ async function ensureDeploymentSmokeTable(database: D1Database) {
 
 export interface DeploymentSmokeEnv {
   DB?: D1Database;
+  DEPLOYMENT_RATE_LIMITER?: RateLimit;
 }
 
-function jsonError(message: string, status: number) {
+function jsonError(message: string, status: number, extraHeaders?: Record<string, string>) {
   return new Response(JSON.stringify({ error: message }), {
     status,
     headers: {
       "cache-control": "no-store",
       "content-type": "application/json; charset=utf-8",
+      ...extraHeaders,
     },
   });
 }
@@ -70,7 +72,21 @@ export async function handleDeploymentSmoke(
   if ((contentLength !== null && contentLength !== "0") || request.body !== null) {
     return jsonError("Release verification does not accept a request body.", 400);
   }
-  if (!env.DB) return jsonError("Release verification could not be completed.", 503);
+  if (!env.DB || !env.DEPLOYMENT_RATE_LIMITER) {
+    return jsonError("Release verification could not be completed.", 503);
+  }
+
+  let rateLimit: { success: boolean };
+  try {
+    rateLimit = await env.DEPLOYMENT_RATE_LIMITER.limit({ key: "deployment-smoke" });
+  } catch {
+    return jsonError("Release verification could not be completed.", 503);
+  }
+  if (!rateLimit.success) {
+    return jsonError("Release verification is temporarily rate limited.", 429, {
+      "retry-after": "60",
+    });
+  }
 
   try {
     await ensureDeploymentSmokeTable(env.DB);
