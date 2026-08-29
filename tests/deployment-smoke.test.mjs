@@ -62,6 +62,26 @@ test("writes only a fixed release marker and returns an empty 204", async () => 
   );
 });
 
+test("routes the production smoke through the Worker security boundary", async () => {
+  const workerUrl = new URL("../dist/server/index.js", import.meta.url);
+  workerUrl.searchParams.set("deployment-smoke-test", `${process.pid}-${Date.now()}`);
+  const { default: worker } = await import(workerUrl.href);
+  const { calls, database } = makeDatabase();
+  const response = await worker.fetch(request(), {
+    ASSETS: { fetch: async () => new Response("Not found", { status: 404 }) },
+    DB: database,
+  }, {
+    waitUntil() {},
+    passThroughOnException() {},
+  });
+
+  assert.equal(response.status, 204);
+  assert.equal(response.headers.get("x-pausesure-web-version"), expectedVersion);
+  assert.equal(response.headers.get("x-content-type-options"), "nosniff");
+  assert.match(response.headers.get("content-security-policy") ?? "", /default-src 'self'/u);
+  assert.equal(calls.filter((call) => call.type === "run").length, 1);
+});
+
 test("rejects untrusted, malformed, or body-bearing requests before D1", async () => {
   const cases = [
     new Request(`${canonicalOrigin}/api/deployment-smoke`, { method: "GET" }),
