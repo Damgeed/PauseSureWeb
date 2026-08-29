@@ -11,7 +11,7 @@ import {
 } from "./privacy-events";
 
 const canonicalOrigin = "https://pausesure.com";
-const webReleaseVersion = "pausesure-web-6.3.0";
+const webReleaseVersion = "pausesure-web-6.3.1";
 
 interface Env extends PrivacyEventEnv, DeploymentSmokeEnv {
   ASSETS: Fetcher;
