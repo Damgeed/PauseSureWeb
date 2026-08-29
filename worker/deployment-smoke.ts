@@ -1,33 +1,6 @@
 const canonicalOrigin = "https://pausesure.com";
 const maximumReleaseVersionCharacters = 64;
 
-export const createDeploymentSmokeTable = `
-  CREATE TABLE IF NOT EXISTS deployment_smoke (
-    id INTEGER PRIMARY KEY CHECK (id = 1),
-    web_version TEXT NOT NULL CHECK (
-      length(web_version) BETWEEN 1 AND ${maximumReleaseVersionCharacters}
-      AND web_version GLOB 'pausesure-web-[0-9]*.[0-9]*.[0-9]*'
-    ),
-    checked_at INTEGER NOT NULL CHECK (checked_at > 0)
-  )
-`;
-
-const schemaInitializationByDatabase = new WeakMap<D1Database, Promise<void>>();
-
-async function ensureDeploymentSmokeTable(database: D1Database) {
-  let initialization = schemaInitializationByDatabase.get(database);
-  if (!initialization) {
-    initialization = database.exec(createDeploymentSmokeTable)
-      .then(() => undefined)
-      .catch((error) => {
-        schemaInitializationByDatabase.delete(database);
-        throw error;
-      });
-    schemaInitializationByDatabase.set(database, initialization);
-  }
-  await initialization;
-}
-
 export interface DeploymentSmokeEnv {
   DB?: D1Database;
   DEPLOYMENT_RATE_LIMITER?: RateLimit;
@@ -121,7 +94,8 @@ export async function handleDeploymentSmoke(
   }
 
   try {
-    await ensureDeploymentSmokeTable(env.DB);
+    // The reviewed migration is applied before every production deployment.
+    // Request handlers must not perform schema changes at runtime.
     await env.DB.prepare(`
       INSERT INTO deployment_smoke (id, web_version, checked_at)
       VALUES (1, ?, ?)
