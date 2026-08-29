@@ -1,0 +1,51 @@
+name: Inspect generated Worker config
+
+on:
+  push:
+    branches: [ops/inspect-generated-worker-config-20260829]
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22.13.0
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - name: Print generated deployment bindings
+        run: |
+          node --input-type=module <<'NODE'
+          import { readFile } from "node:fs/promises";
+          const config = JSON.parse(await readFile("dist/server/wrangler.json", "utf8"));
+          console.log(JSON.stringify({
+            name: config.name,
+            main: config.main,
+            d1_databases: config.d1_databases,
+            ratelimits: config.ratelimits,
+            assets: config.assets,
+            routes: config.routes,
+          }, null, 2));
+          NODE
+      - name: Verify generated binding identifiers
+        run: |
+          node --input-type=module <<'NODE'
+          import { readFile } from "node:fs/promises";
+          const config = JSON.parse(await readFile("dist/server/wrangler.json", "utf8"));
+          const d1 = config.d1_databases?.find((binding) => binding.binding === "DB");
+          if (d1?.database_id !== "81dfb963-3dfb-46db-89a5-9a9415e671f8") {
+            throw new Error(`Generated D1 binding is incorrect: ${JSON.stringify(d1)}`);
+          }
+          const names = new Set((config.ratelimits ?? []).map((binding) => binding.name));
+          if (!names.has("ANALYTICS_RATE_LIMITER") || !names.has("DEPLOYMENT_RATE_LIMITER")) {
+            throw new Error(`Generated rate-limit bindings are incomplete: ${JSON.stringify([...names])}`);
+          }
+          NODE
