@@ -35,14 +35,15 @@
     "crons": ["17 3 * * *"]
   },
 
-  // Cloudflare can provision this D1 database on the first deployment because
-  // no database_id is committed. Do not replace this with a fake UUID. After
-  // the first deployment, apply the checked-in migrations as documented in
-  // docs/CLOUDFLARE_DEPLOYMENT.md.
+  // This identifier is the existing production database selected by name and
+  // verified through the authenticated Cloudflare account. D1 identifiers are
+  // not credentials; committing the real ID keeps Worker runtime bindings and
+  // Wrangler migration commands pointed at the same reviewed database.
   "d1_databases": [
     {
       "binding": "DB",
       "database_name": "pausesure-web-analytics",
+      "database_id": "81dfb963-3dfb-46db-89a5-9a9415e671f8",
       "migrations_dir": "drizzle"
     }
   ],

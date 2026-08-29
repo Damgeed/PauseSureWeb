@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import { access, readFile } from "node:fs/promises";
 import test from "node:test";
 
+const productionD1DatabaseID = "81dfb963-3dfb-46db-89a5-9a9415e671f8";
+
 test("uses a first-party Cloudflare Workers configuration", async () => {
   const source = await readFile(new URL("../wrangler.jsonc", import.meta.url), "utf8");
   const packageJson = JSON.parse(await readFile(new URL("../package.json", import.meta.url), "utf8"));
@@ -12,6 +14,12 @@ test("uses a first-party Cloudflare Workers configuration", async () => {
   assert.match(source, /"main"\s*:\s*"\.\/worker\/index\.ts"/);
   assert.match(source, /"binding"\s*:\s*"DB"/);
   assert.match(source, /"database_name"\s*:\s*"pausesure-web-analytics"/);
+  assert.match(source, new RegExp(`"database_id"\\s*:\\s*"${productionD1DatabaseID}"`, "u"));
+  assert.equal(
+    (source.match(/"database_id"\s*:/gu) ?? []).length,
+    1,
+    "the Worker must bind exactly one reviewed production D1 database",
+  );
   assert.match(source, /"pattern"\s*:\s*"pausesure\.com"/);
   assert.match(source, /"pattern"\s*:\s*"www\.pausesure\.com"/);
   assert.match(source, /"workers_dev"\s*:\s*false/);
@@ -22,7 +30,7 @@ test("uses a first-party Cloudflare Workers configuration", async () => {
   assert.match(source, /"period"\s*:\s*60/);
   assert.match(source, /"crons"\s*:\s*\["17 3 \* \* \*"\]/);
   assert.doesNotMatch(source, /"images"\s*:/, "the unused image transformation binding must remain disabled");
-  assert.ok(major > 4 || (major === 4 && minor >= 102), "Wrangler must resolve auto-provisioned D1 bindings for remote migrations");
+  assert.ok(major > 4 || (major === 4 && minor >= 102), "Wrangler must resolve production D1 bindings for remote migrations");
   assert.doesNotMatch(source, /(?:database_id|account_id)"?\s*:\s*"(?:0{8}-|<|replace|example|fake)/i, "placeholder Cloudflare identifiers must not be committed");
   assert.doesNotMatch(source, /(?:OpenAI|ChatGPT|site-creator)/i);
 });
