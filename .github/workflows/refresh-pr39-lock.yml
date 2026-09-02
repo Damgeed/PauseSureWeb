@@ -26,7 +26,6 @@ jobs:
         run: |
           set -euo pipefail
           npm install --package-lock-only --ignore-scripts
-          npm ls browserslist
           git diff --exit-code -- package.json
           git diff -- package-lock.json
       - name: Commit lockfile only
